@@ -389,6 +389,17 @@ html, body {
 .tile.mortgaged {
     filter: grayscale(0.75) brightness(0.8);
 }
+
+.tile.tile-occupied {
+    outline: 2px solid var(--gold-bright);
+    outline-offset: -1px;
+    z-index: 3;
+    animation: tile-glow-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tile-glow-pulse {
+    0%, 100% { filter: brightness(1.05); }
+    50% { filter: brightness(1.22); }
+}
 .house-badge {
     position: absolute;
     top: 1px;
