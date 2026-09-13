@@ -43,6 +43,7 @@ public class GameState {
     private AuctionState auction;
     private NegotiationSession negotiation;
     private PendingDebt pendingDebt;
+    private PendingCardMove pendingCardMove;
     private boolean hasRolledThisTurn = false;
     private boolean negotiationUsedThisTurn = false;
 
@@ -121,6 +122,8 @@ public class GameState {
     public void setNegotiation(NegotiationSession n) { this.negotiation = n; }
     public PendingDebt getPendingDebt() { return pendingDebt; }
     public void setPendingDebt(PendingDebt d) { this.pendingDebt = d; }
+    public PendingCardMove getPendingCardMove() { return pendingCardMove; }
+    public void setPendingCardMove(PendingCardMove m) { this.pendingCardMove = m; }
     public boolean isHasRolledThisTurn() { return hasRolledThisTurn; }
     public void setHasRolledThisTurn(boolean v) { this.hasRolledThisTurn = v; }
     public boolean isNegotiationUsedThisTurn() { return negotiationUsedThisTurn; }

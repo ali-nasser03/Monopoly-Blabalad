@@ -27,6 +27,7 @@ public record GameStateResponse(
         AuctionView auction,
         NegotiationView negotiation,
         PendingDebtView pendingDebt,
+        boolean pendingCardMove,
         boolean hasRolledThisTurn,
         boolean negotiationUsedThisTurn,
         boolean canNegotiate,
@@ -47,11 +48,11 @@ public record GameStateResponse(
     public record PendingPurchaseView(int position, String playerId, long deadlineEpochMs) {}
 
     public record AuctionView(int position, String openerPlayerId, int openingPrice,
-                               Integer currentBid, String currentBidderId, long deadlineEpochMs) {}
+                              Integer currentBid, String currentBidderId, long deadlineEpochMs) {}
 
     public record NegotiationView(String initiatorId, String counterpartId, int offerCash,
-                                   java.util.List<Integer> offerProperties, int requestCash,
-                                   java.util.List<Integer> requestProperties, long deadlineEpochMs) {}
+                                  java.util.List<Integer> offerProperties, int requestCash,
+                                  java.util.List<Integer> requestProperties, long deadlineEpochMs) {}
 
     public record PendingDebtView(String playerId, String creditorId, int amountOwed, long deadlineEpochMs) {}
 
@@ -113,6 +114,7 @@ public record GameStateResponse(
                 auctionView,
                 negotiationView,
                 debtView,
+                s.getPendingCardMove() != null,
                 s.isHasRolledThisTurn(),
                 s.isNegotiationUsedThisTurn(),
                 canNegotiate,

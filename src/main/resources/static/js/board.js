@@ -604,7 +604,7 @@ function renderTurnUI(actionDelayMs) {
 
     renderEventLog();
 
-    const busy = !!gameState.pendingPurchase || !!gameState.auction || !!gameState.pendingDebt;
+    const busy = !!gameState.pendingPurchase || !!gameState.auction || !!gameState.pendingDebt || !!gameState.pendingCardMove;
     const iAmJailed = !!(gameState.inJail && gameState.inJail[myPlayerId]);
     const isMyTurn = gameState.currentTurnPlayerId === myPlayerId && !gameState.ended && !busy && !iAmJailed;
     const rollBtn = document.getElementById('roll-btn');

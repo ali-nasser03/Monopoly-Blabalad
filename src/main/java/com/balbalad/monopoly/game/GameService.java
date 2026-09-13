@@ -37,6 +37,7 @@ public class GameService {
     private static final int VOTE_SECONDS = 30;
     private static final int NEGOTIATION_SECONDS = 30;
     private static final int DEBT_SECONDS = 45;
+    private static final int CARD_MOVE_DELAY_SECONDS = 4;
     private static final int PASS_GO_BONUS = 200;
     private static final int JAIL_POSITION = 10;
     private static final int GO_TO_JAIL_POSITION = 30;
@@ -82,6 +83,9 @@ public class GameService {
             }
             if (state.getPendingDebt() != null) {
                 throw bad("في دين معلق لازم يتسدد أول");
+            }
+            if (state.getPendingCardMove() != null) {
+                throw bad("لسا في حركة بطاقة ما خلصت");
             }
             if (!state.currentPlayerId().equals(playerId)) throw bad("مش دورك هلأ");
 
@@ -231,7 +235,7 @@ public class GameService {
     );
 
     private void resolveCardDraw(GameState state, Room room, String playerId, CardDeckType deckType,
-                                  boolean advanceAfter, int diceSum) {
+                                 boolean advanceAfter, int diceSum) {
         Card card = drawCard(state, deckType);
         state.setLastCard(card.text(), deckType);
         logEvent(state, playerName(room, playerId) + " سحب " + DECK_LABELS.get(deckType) + ": " + card.text());
@@ -268,7 +272,7 @@ public class GameService {
     }
 
     private void applyCardEffect(GameState state, Room room, String playerId, Card card,
-                                  boolean advanceAfter, int diceSum) {
+                                 boolean advanceAfter, int diceSum) {
         switch (card.type()) {
             case PAY -> {
                 boolean paid = chargeOrGoIntoDebt(state, playerId, card.amount(), null, advanceAfter);
@@ -309,17 +313,31 @@ public class GameService {
                 state.getSkipNextTurn().put(playerId, true);
                 finishDecision(state, room, advanceAfter);
             }
-            case MOVE_TO -> {
-                moveToPosition(state, room, playerId, card.targetPosition());
-                resolveLandingConsequences(state, room, playerId, advanceAfter, diceSum);
-            }
-            case MOVE_RELATIVE -> {
-                moveRelative(state, room, playerId, card.steps());
-                resolveLandingConsequences(state, room, playerId, advanceAfter, diceSum);
+            case MOVE_TO, MOVE_RELATIVE -> {
+                // منوقف هون: نخلي اللاعب يبين لسا واقف عالبطاقة (مع نصها)
+                // بهاد البث، وبعد فترة قصيرة الفحص الدوري بينفذ الحركة
+                // الفعلية وبيبث تاني - حتى القطعة توصل فعلًا للبطاقة أول
+                // بدل ما تقفز مباشرة لنتيجة الحركة الإضافية.
+                state.setPendingCardMove(new PendingCardMove(playerId, card, diceSum, advanceAfter,
+                        Instant.now().plusSeconds(CARD_MOVE_DELAY_SECONDS)));
             }
             case DRAW_CHANCE -> resolveCardDraw(state, room, playerId, CardDeckType.CHANCE, advanceAfter, diceSum);
             case DRAW_CHEST -> resolveCardDraw(state, room, playerId, CardDeckType.COMMUNITY_CHEST, advanceAfter, diceSum);
         }
+    }
+
+    private void resolvePendingCardMove(GameState state, Room room) {
+        PendingCardMove pcm = state.getPendingCardMove();
+        state.setPendingCardMove(null);
+        Card card = pcm.getCard();
+        String playerId = pcm.getPlayerId();
+
+        if (card.type() == CardEffectType.MOVE_TO) {
+            moveToPosition(state, room, playerId, card.targetPosition());
+        } else {
+            moveRelative(state, room, playerId, card.steps());
+        }
+        resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
     }
 
     private void moveToPosition(GameState state, Room room, String playerId, int target) {
@@ -872,8 +890,8 @@ public class GameService {
     }
 
     public GameState proposeTrade(String code, String playerId, String counterpartId,
-                                   int offerCash, List<Integer> offerProperties,
-                                   int requestCash, List<Integer> requestProperties) {
+                                  int offerCash, List<Integer> offerProperties,
+                                  int requestCash, List<Integer> requestProperties) {
         Room room = roomService.getRoomOrThrow(code);
         GameState state = getStateOrThrow(code);
         synchronized (state) {
@@ -1118,6 +1136,11 @@ public class GameService {
 
                     if (state.getPendingDebt() != null && now.isAfter(state.getPendingDebt().getDeadline())) {
                         resolveDebtAutomatically(state, room);
+                        broadcast(code, state);
+                    }
+
+                    if (state.getPendingCardMove() != null && now.isAfter(state.getPendingCardMove().getResolveAt())) {
+                        resolvePendingCardMove(state, room);
                         broadcast(code, state);
                     }
 
