@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>مونوبولي بالبلد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Reem+Kufi:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- تظهر بالوضع العمودي فقط -->
+<div id="rotate-overlay" class="rotate-overlay">
+    <div class="rotate-icon">↻</div>
+    <p>دوّر جهازك للوضع الأفقي حتى تبين اللعبة كاملة بدون تصغير أو تمرير</p>
+</div>
+
+<div id="app-shell" class="app-shell">
+
+    <!-- 1) شاشة البداية -->
+    <section id="screen-landing" class="screen landing-screen active">
+        <div class="parchment-card landing-card">
+            <h1 class="landing-title">مونوبولي بالبلد</h1>
+            <div class="landing-actions">
+                <button class="wood-btn large" data-goto="screen-join">دخول لعبة</button>
+                <button class="wood-btn large primary" data-goto="screen-create">إنشاء لعبة</button>
+            </div>
+            <button class="link-btn" data-open-rules>قوانين اللعبة</button>
+        </div>
+    </section>
+
+    <!-- 2) إنشاء غرفة -->
+    <section id="screen-create" class="screen form-screen">
+        <div class="parchment-card form-card">
+            <button class="back-btn" data-goto="screen-landing" aria-label="رجوع">→</button>
+            <h2>إنشاء لعبة</h2>
+
+            <label for="create-name">اسم اللاعب</label>
+            <input type="text" id="create-name" maxlength="20" placeholder="اكتب اسمك">
+
+            <label>اختر قطعتك</label>
+            <div id="create-piece-picker" class="piece-picker"></div>
+
+            <label>عدد اللاعبين</label>
+            <div class="count-picker" id="create-count-picker">
+                <button type="button" class="count-btn" data-count="2">2</button>
+                <button type="button" class="count-btn" data-count="3">3</button>
+                <button type="button" class="count-btn active" data-count="4">4</button>
+            </div>
+
+            <p class="form-error" id="create-error"></p>
+            <button class="wood-btn" id="create-submit">إنشاء اللعبة</button>
+            <p class="hint-text">سيظهر لك كود من 4 أرقام لدعوة أصحابك</p>
+        </div>
+    </section>
+
+    <!-- 3) دخول غرفة -->
+    <section id="screen-join" class="screen form-screen">
+        <div class="parchment-card form-card">
+            <button class="back-btn" data-goto="screen-landing" aria-label="رجوع">→</button>
+            <h2>دخول لعبة</h2>
+
+            <label for="join-name">اسم اللاعب</label>
+            <input type="text" id="join-name" maxlength="20" placeholder="اكتب اسمك">
+
+            <label>اختر قطعتك</label>
+            <div id="join-piece-picker" class="piece-picker"></div>
+
+            <label>كود الغرفة</label>
+            <div class="code-input" id="join-code-boxes">
+                <input maxlength="1" inputmode="numeric" pattern="[0-9]*" class="code-box">
+                <input maxlength="1" inputmode="numeric" pattern="[0-9]*" class="code-box">
+                <input maxlength="1" inputmode="numeric" pattern="[0-9]*" class="code-box">
+                <input maxlength="1" inputmode="numeric" pattern="[0-9]*" class="code-box">
+            </div>
+
+            <p class="form-error" id="join-error"></p>
+            <button class="wood-btn" id="join-submit">دخول الغرفة</button>
+            <p class="hint-text">استخدم نفس الاسم والقطعة للعودة إلى غرفتك إذا انقطع اتصالك</p>
+        </div>
+    </section>
+
+    <!-- 4) غرفة الانتظار -->
+    <section id="screen-lobby" class="screen lobby-screen">
+        <div class="parchment-card form-card">
+            <h2>غرفة اللعب</h2>
+
+            <label>كود الغرفة</label>
+            <div class="room-code-display">
+                <span id="lobby-code">----</span>
+                <button type="button" id="copy-code-btn" class="wood-btn small">نسخ الكود</button>
+            </div>
+
+            <label>اللاعبون</label>
+            <ul id="lobby-players" class="lobby-players"></ul>
+
+            <p class="form-error" id="lobby-error"></p>
+            <button class="wood-btn" id="start-game-btn">بدء اللعبة</button>
+            <p class="hint-text" id="lobby-hint"></p>
+            <button class="link-btn" data-open-rules>قوانين اللعبة</button>
+        </div>
+    </section>
+
+    <!-- 5) شاشة اللعب -->
+    <section id="screen-game" class="screen app">
+
+        <aside class="side-panel players-panel">
+            <h2 class="panel-title">اللاعبون</h2>
+            <div class="match-timer" id="match-timer">⏱ --:--</div>
+            <div class="my-balance" id="my-balance-wrap">رصيدك: <span id="my-balance">₪1500</span></div>
+            <ul id="players-list" class="players-list"></ul>
+
+            <div class="last-landed" id="last-landed-panel">
+                <h2 class="panel-title">سجل الأحداث</h2>
+                <div id="event-log-content" class="event-log-content">—</div>
+            </div>
+        </aside>
+
+        <div class="board-wrapper">
+            <div id="board" class="board">
+                <div class="corner-motif corner-motif--left" aria-hidden="true"></div>
+                <div class="corner-motif corner-motif--right" aria-hidden="true"></div>
+                <div id="board-grid" class="board-grid" role="grid" aria-label="لوح مونوبولي بالبلد"></div>
+            </div>
+        </div>
+
+        <aside class="side-panel dice-panel">
+            <h2 class="panel-title">النرد</h2>
+            <div class="dice-tray">
+                <div id="die-1" class="die">1</div>
+                <div id="die-2" class="die">1</div>
+            </div>
+            <p class="turn-status" id="turn-status">...</p>
+            <button id="roll-btn" class="wood-btn" disabled>ارمِ النرد</button>
+            <button id="negotiate-btn" class="wood-btn secondary hidden">تفاوض</button>
+            <button class="wood-btn secondary" data-open-rules>قوانين اللعبة</button>
+            <button id="end-game-btn" class="wood-btn danger">إنهاء اللعبة</button>
+        </aside>
+    </section>
+</div>
+
+<!-- نافذة بطاقة الأرض -->
+<div id="property-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <button id="close-modal" class="close-btn" aria-label="إغلاق">×</button>
+        <div id="property-card-content"></div>
+    </div>
+</div>
+
+<!-- نافذة القوانين (نص مبدئي، المرجع الكامل جاي لاحقًا) -->
+<div id="rules-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card rules-content">
+        <button id="close-rules" class="close-btn" aria-label="إغلاق">×</button>
+        <h2>قوانين مونوبولي بالبلد</h2>
+
+        <h3>البداية</h3>
+        <p>كل لاعب يبلش برصيد ₪1500. الهدف إنك تضل آخر لاعب واقف، أو تكون صاحب أعلى قيمة إجمالية لما تخلص اللعبة.</p>
+
+        <h3>الدور والنرد</h3>
+        <ul>
+            <li>ترمي نردين وتتحرك يمين-لشمال حول اللوح.</li>
+            <li>دبل (نفس الرقم بالنردين) بيعطيك رمية إضافية بنفس دورك.</li>
+            <li>3 دبل متتالي بنفس الدور = رايح على المسكوبية فورًا.</li>
+            <li>كل ما تمر أو توقف على "البداية"، بتاخد ₪200.</li>
+            <li>عندك 45 ثانية ترمي، وإلا يتسجل غياب ويعدي دورك تلقائيًا.</li>
+        </ul>
+
+        <h3>الشراء والمزاد</h3>
+        <ul>
+            <li>وقفت على أرض أو مرفق فاضي؟ عندك 20 ثانية تختار: تشتريه بالسعر المكتوب، أو تفتح مزاد.</li>
+            <li>ما قررت بالوقت؟ بينفتح مزاد تلقائيًا.</li>
+            <li>المزاد يبلش من 50% من السعر، وكل لاعب متصل غيرك (غير فاتح المزاد) يقدر يزايد.</li>
+            <li>كل مزايدة لازم تكون أعلى من الحالية بـ₪10 ع الأقل، و10 ثواني بترجع تتجدد مع كل مزايدة صحيحة.</li>
+            <li>محدا زايد؟ فاتح المزاد ملزم يشتريها بسعر الافتتاح (50%).</li>
+        </ul>
+
+        <h3>الإيجار</h3>
+        <ul>
+            <li>وقفت على أرض حدا ثاني مالكها (وغير مرهونة)؟ بيتخصم منك الإيجار وينضاف إله فورًا.</li>
+            <li>لو مالك المجموعة كاملة وبعده ما بنى، الإيجار بيصير ضعف الرقم المكتوب.</li>
+            <li>المرافق (كهرباء/مياه): الإيجار = مجموع النرد ×4 لو تملك مرفق واحد، أو ×10 لو تملك الاثنين.</li>
+        </ul>
+
+        <h3>البناء والهدم</h3>
+        <ul>
+            <li>لازم تملك كل أراضي المجموعة كاملة، وما يكون فيها أي أرض مرهونة، حتى تقدر تبني.</li>
+            <li>لازم تبني بالتساوي: ما تقدر تزيد دار على أرض قبل ما تخلص الباقي بنفس المجموعة (وبالعكس بالهدم).</li>
+            <li>تكلفة الدار حسب لون المجموعة: ₪50 (بني/أزرق فاتح)، ₪100 (زهري/برتقالي)، ₪150 (أحمر/أصفر)، ₪200 (أخضر/أزرق غامق).</li>
+            <li>بعد 4 دور، الخامسة بتصير عمارة. الهدم بيرجعلك نص التكلفة.</li>
+        </ul>
+
+        <h3>الرهن وفك الرهن</h3>
+        <ul>
+            <li>ترهن أي أرض أو مرفق إلك (بدون بناء عليه) مقابل 50% من سعره. الأرض المرهونة ما بتجمّع إيجار.</li>
+            <li>ما تقدر ترهن أرض إذا في بناء على أي أرض تانية بنفس مجموعتها.</li>
+            <li>فك الرهن يكلفك 110% من قيمة الرهن (يعني القيمة + 10%).</li>
+        </ul>
+
+        <h3>البطاقات</h3>
+        <ul>
+            <li>فرصة وصندوق الجماعة: بتوقف عليهم وتسحب بطاقة عشوائية، وتنعرض للجميع (رصيدك يضل خاص فيك).</li>
+            <li>بوابات القدس الأربعة: بطاقة عشوائية خاصة فيهم، مش قابلة للشراء. بعض بطاقاتها بتخليك تسحب فرصة أو صندوق جماعة كمان.</li>
+            <li>بطاقة "شحرور": خروج مجاني من المسكوبية، تحتفظ فيها لحد ما تحتاجها.</li>
+        </ul>
+
+        <h3>المسكوبية</h3>
+        <p>بدورك وإنت مسجون، اختار وحدة: ادفع ₪50 واطلع والعب عادي، أو ارمِ النرد وحاول دبل (لو نجحت بتطلع وتتحرك بدون رمية إضافية)، أو استخدم بطاقة شحرور لو معك. بعد 3 محاولات فاشلة متتالية، بتطلع تلقائيًا وتدفع ₪50.</p>
+
+        <h3>التفاوض والتداول</h3>
+        <ul>
+            <li>ما بيصير متاح إلا بعد ما تنباع كل الأراضي والمرافق (24 خانة).</li>
+            <li>بس صاحب الدور الحالي يقدر يفتح عرض، وقبل ما يرمي النرد هاد الدور، وعرض واحد بس بكل دور.</li>
+            <li>العرض بيشمل نقود و/أو أراضي (بدون بناء عليها) بالاتجاهين.</li>
+            <li>الطرف التاني عنده 30 ثانية يقبل أو يرفض، وإلا العرض بينلغى تلقائيًا.</li>
+        </ul>
+
+        <h3>الإفلاس</h3>
+        <ul>
+            <li>ما قدرت تدفع (إيجار، ضريبة، بطاقة، شراء إجباري بمزاد)؟ بتفتح نافذة "رصيدك غير كافٍ" فيها 45 ثانية.</li>
+            <li>ترهن أو تهدم مباشرة من نفس النافذة لتغطي المبلغ، وبعدين تدوس "سدد المبلغ".</li>
+            <li>أو تعلن إفلاسك: أملاكك (بعد هدم أي بناء عليها بنص القيمة) بتروح لصاحب الدين مرهونة (لو الدين لاعب)، أو ترجع فاضية للبنك (لو الدين ضريبة/بطاقة).</li>
+            <li>ما قررت بالوقت؟ تلقائيًا: هدم كل شي ممكن ← رهن كل شي ممكن ← إفلاس إجباري لو ما كفى.</li>
+            <li>ضل لاعب واحد بس بعد الإفلاس؟ بيربح مباشرة.</li>
+        </ul>
+
+        <h3>نهاية اللعبة</h3>
+        <ul>
+            <li>مؤقت كلي 60 دقيقة. لما يخلص، بينفتح تصويت "تمديد 15 دقيقة" لازم إجماع كل المتصلين، وإلا اللعبة بتنتهي.</li>
+            <li>أي لاعب متصل يقدر يقترح إنهاء اللعبة يدويًا بأي وقت، وبرضه لازم إجماع كل المتصلين.</li>
+            <li>القيمة الإجمالية = نقدك + سعر كل أرض/مرفق تملكه + كل مصاري دفعتها عالبناء - أي رهن قائم عليك.</li>
+            <li>الأعلى قيمة بيربح. تعادل بالقمة = بدون فائز معلن.</li>
+        </ul>
+    </div>
+</div>
+
+<!-- نافذة تركيب عرض تفاوض جديد -->
+<div id="negotiate-compose-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card negotiate-card">
+        <button id="close-negotiate-compose" class="close-btn" aria-label="إغلاق">×</button>
+        <h2>تفاوض</h2>
+
+        <label class="neg-label">تتفاوض مع</label>
+        <select id="neg-counterpart"></select>
+
+        <div class="negotiate-columns">
+            <div class="negotiate-col">
+                <h3>عرضك</h3>
+                <label class="neg-label">مبلغ</label>
+                <input type="number" id="neg-offer-cash" min="0" value="0">
+                <p class="hint-text" id="neg-offer-cash-hint"></p>
+                <label class="neg-label">أراضيك</label>
+                <div id="neg-offer-properties" class="neg-property-list"></div>
+            </div>
+            <div class="negotiate-col">
+                <h3 id="neg-request-title">مقابل</h3>
+                <label class="neg-label">مبلغ</label>
+                <input type="number" id="neg-request-cash" min="0" value="0">
+                <label class="neg-label">أراضي الطرف التاني</label>
+                <div id="neg-request-properties" class="neg-property-list"></div>
+            </div>
+        </div>
+
+        <p class="form-error" id="negotiate-error"></p>
+        <button id="neg-send-btn" class="wood-btn">أرسل العرض</button>
+    </div>
+</div>
+
+<!-- نافذة استقبال عرض تفاوض / متابعة عرض مُرسل -->
+<div id="negotiate-incoming-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2 id="neg-incoming-title"></h2>
+        <div class="negotiate-columns">
+            <div class="negotiate-col">
+                <p id="neg-incoming-get"></p>
+            </div>
+            <div class="negotiate-col">
+                <p id="neg-incoming-give"></p>
+            </div>
+        </div>
+        <p class="auction-timer" id="neg-incoming-timer"></p>
+        <div class="endvote-actions" id="neg-respond-actions">
+            <button id="neg-accept-btn" class="wood-btn">قبول</button>
+            <button id="neg-reject-btn" class="wood-btn secondary">رفض</button>
+        </div>
+        <button id="neg-cancel-btn" class="wood-btn danger hidden">اسحب عرضي</button>
+    </div>
+</div>
+
+<!-- نافذة إعلان البطاقة (فرصة/صندوق الجماعة/بوابة) -->
+<div id="card-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card card-announce">
+        <h2 id="card-deck-title"></h2>
+        <p id="card-text"></p>
+    </div>
+</div>
+
+<!-- لوحة المسكوبية لصاحب الدور -->
+<div id="jail-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2>إنت بالمسكوبية</h2>
+        <p class="hint-text" id="jail-attempts-text"></p>
+        <div class="jail-actions">
+            <button id="jail-pay-btn" class="wood-btn">ادفع ₪50 واطلع</button>
+            <button id="jail-roll-btn" class="wood-btn secondary">ارمِ النرد (حاول دبل)</button>
+            <button id="jail-card-btn" class="wood-btn hidden">استخدم بطاقة شحرور</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة الدين المعلق (رصيدك غير كافٍ) -->
+<div id="debt-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2>رصيدك غير كافٍ</h2>
+        <table class="rent-table">
+            <tbody>
+                <tr><td>المبلغ المطلوب</td><td id="debt-amount"></td></tr>
+                <tr><td>رصيدك</td><td id="debt-balance"></td></tr>
+                <tr><td>المتبقي</td><td id="debt-remaining"></td></tr>
+            </tbody>
+        </table>
+        <p class="auction-timer" id="debt-timer"></p>
+
+        <p class="neg-label">ارهن أرض</p>
+        <div id="debt-mortgage-list" class="neg-property-list"></div>
+
+        <p class="neg-label">اهدم دار</p>
+        <div id="debt-demolish-list" class="neg-property-list"></div>
+
+        <div class="jail-actions">
+            <button id="debt-pay-btn" class="wood-btn">سدد المبلغ</button>
+            <button id="debt-bankrupt-btn" class="wood-btn danger">أعلن الإفلاس</button>
+        </div>
+        <p class="hint-text">عند انتهاء الوقت، بينفّذ الحل الأنسب تلقائيًا (هدم، وإلا رهن، وإلا إفلاس).</p>
+    </div>
+</div>
+
+<!-- نافذة قرار الشراء -->
+<div id="buy-decision-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2 id="buy-decision-title"></h2>
+        <p class="card-price" id="buy-decision-price"></p>
+        <div class="endvote-actions">
+            <button id="buy-now-btn" class="wood-btn">اشترِ الآن</button>
+            <button id="open-auction-btn" class="wood-btn secondary">افتح مزاد</button>
+        </div>
+        <p class="hint-text">إذا ما قررت خلال 20 ثانية، بينفتح مزاد تلقائيًا.</p>
+    </div>
+</div>
+
+<!-- نافذة المزاد -->
+<div id="auction-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2 id="auction-title"></h2>
+        <p class="card-price" id="auction-current-price"></p>
+        <p class="auction-timer" id="auction-timer"></p>
+        <p class="hint-text" id="auction-status"></p>
+        <button id="auction-bid-btn" class="wood-btn">زايد إلى ₪<span id="auction-next-bid"></span></button>
+    </div>
+</div>
+
+<!-- نافذة تصويت إنهاء اللعبة -->
+<div id="endvote-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2>تصويت إنهاء اللعبة</h2>
+        <ul id="endvote-list" class="lobby-players"></ul>
+        <p class="hint-text">لازم كل اللاعبين المتصلين حاليًا يوافقوا حتى تنتهي اللعبة فعليًا. مهلة الرد 30 ثانية.</p>
+        <div class="endvote-actions">
+            <button id="endvote-approve" class="wood-btn">موافق، أنهي اللعبة</button>
+            <button id="endvote-reject" class="wood-btn secondary">لأ، كمل اللعب</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تصويت تمديد الوقت (بعد 60 دقيقة) -->
+<div id="extend-vote-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2>انتهى وقت اللعبة</h2>
+        <p class="hint-text">هل تريدون تمديد اللعبة 15 دقيقة؟ لازم يوافق كل اللاعبين المتصلين، وإلا اللعبة بتنتهي.</p>
+        <ul id="extend-vote-list" class="lobby-players"></ul>
+        <p class="auction-timer" id="extend-vote-timer"></p>
+        <div class="endvote-actions" id="extend-vote-actions">
+            <button id="extend-approve-btn" class="wood-btn">تمديد 15 دقيقة</button>
+            <button id="extend-reject-btn" class="wood-btn secondary">إنهاء اللعبة</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة نهاية اللعبة والنتائج -->
+<div id="gameover-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card results-card">
+        <h2>انتهت اللعبة</h2>
+        <div id="winner-banner" class="winner-banner"></div>
+        <ul id="results-list" class="results-list"></ul>
+        <button id="gameover-rate-btn" class="wood-btn">قيّم اللعبة</button>
+        <button id="gameover-home-btn" class="wood-btn secondary">الرجوع للصفحة الرئيسية</button>
+    </div>
+</div>
+
+<!-- نافذة التقييم -->
+<div id="rating-modal" class="modal-backdrop hidden">
+    <div class="parchment-card property-card">
+        <h2>قيّم اللعبة</h2>
+        <div class="rating-stars" id="rating-stars">
+            <span data-star="1">★</span><span data-star="2">★</span><span data-star="3">★</span><span data-star="4">★</span><span data-star="5">★</span>
+        </div>
+        <div class="rating-type-picker" id="rating-type-picker">
+            <button data-type="SUGGESTION" class="wood-btn small">اقتراح</button>
+            <button data-type="PROBLEM" class="wood-btn small">مشكلة</button>
+            <button data-type="NOTE" class="wood-btn small active">ملاحظة</button>
+        </div>
+        <textarea id="rating-text" placeholder="اكتب ملاحظتك هنا (اختياري)"></textarea>
+        <button id="rating-submit-btn" class="wood-btn">إرسال التقييم</button>
+        <button id="rating-skip-btn" class="wood-btn secondary">تخطي</button>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/vendor/sockjs.min.js"></script>
+<script src="js/vendor/stomp.min.js"></script>
+<script src="js/board.js"></script>
+<script src="js/room.js"></script>
+</body>
+</html>

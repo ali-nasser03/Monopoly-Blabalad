@@ -1,0 +1,10 @@
+target/
+.idea/
+*.iml
+.vscode/
+.git/
+.gitignore
+.DS_Store
+data/
+README.md
+DEPLOY.md

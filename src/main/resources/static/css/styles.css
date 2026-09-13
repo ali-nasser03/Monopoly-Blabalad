@@ -1,0 +1,902 @@
+:root {
+    --wood-dark: #241509;
+    --wood-mid: #55371d;
+    --wood-light: #8a6239;
+    --gold: #c9a227;
+    --gold-dim: #8a7024;
+    --gold-bright: #e8c94d;
+    --maroon: #6d1f2b;
+    --maroon-bright: #8a2c3a;
+    --maroon-dark: #45131c;
+    --parchment: #ece0c4;
+    --parchment-dark: #d6c39a;
+    --ink: #2b2016;
+    --olive: #545f36;
+
+    --wood-texture:
+        repeating-linear-gradient(105deg, rgba(0,0,0,0.14) 0px, rgba(0,0,0,0.14) 2px, transparent 2px, transparent 6px),
+        repeating-linear-gradient(105deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 8px),
+        radial-gradient(ellipse at 22% 12%, rgba(255,255,255,0.08), transparent 55%),
+        linear-gradient(155deg, var(--wood-mid), var(--wood-dark) 68%);
+
+    --geo-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cg fill='none' stroke='%23c9a227' stroke-width='1' opacity='0.45'%3E%3Crect x='6' y='6' width='28' height='28' transform='rotate(45 20 20)'/%3E%3C/g%3E%3C/svg%3E");
+
+    --dome-motif: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Cpath d='M2 38 L2 22 Q2 10 16 10 Q30 10 30 22 L30 38 Z' fill='%23c9a227'/%3E%3Cpath d='M30 38 L30 22 Q30 10 44 10 Q58 10 58 22 L58 38 Z' fill='%23c9a227'/%3E%3Ccircle cx='16' cy='7' r='2.2' fill='%23c9a227'/%3E%3Ccircle cx='44' cy='7' r='2.2' fill='%23c9a227'/%3E%3Crect x='15' y='2' width='2' height='5' fill='%23c9a227'/%3E%3Crect x='43' y='2' width='2' height='5' fill='%23c9a227'/%3E%3C/svg%3E");
+}
+
+* { box-sizing: border-box; }
+.hidden { display: none !important; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--wood-texture);
+    font-family: 'Cairo', sans-serif;
+    color: var(--parchment);
+}
+
+/* ---------- رسالة "دوّر جهازك" ---------- */
+.rotate-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--wood-texture);
+    color: var(--parchment);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2em;
+}
+.rotate-icon { font-size: 3rem; margin-bottom: 0.6em; color: var(--gold); }
+.rotate-overlay p { max-width: 22em; font-size: 1.05rem; }
+
+.app-shell { display: none; }
+
+@media (orientation: portrait) {
+    .rotate-overlay { display: flex; }
+    .app-shell { display: none !important; }
+}
+@media (orientation: landscape) {
+    .rotate-overlay { display: none; }
+    .app-shell { display: block; }
+}
+
+/* ---------- إطار الشاشات: شاشة وحدة ظاهرة بكل لحظة ---------- */
+.app-shell {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.screen {
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+.screen.active { display: flex; }
+
+.landing-screen, .form-screen, .lobby-screen {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--wood-texture);
+}
+
+/* ---------- الهيكل العام: جناحين + اللوح بالوسط (شاشة اللعب) ---------- */
+.app {
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.side-panel {
+    flex: 0 0 clamp(76px, 18vw, 230px);
+    display: flex;
+    flex-direction: column;
+    padding: clamp(6px, 1.2vh, 16px) clamp(4px, 1vw, 12px);
+    background: var(--wood-texture);
+    overflow: hidden;
+    position: relative;
+}
+.players-panel { box-shadow: inset -3px 0 0 var(--gold-dim); }
+.dice-panel { box-shadow: inset 3px 0 0 var(--gold-dim); }
+
+.panel-title {
+    font-family: 'Reem Kufi', sans-serif;
+    font-size: clamp(11px, 1.6vw, 16px);
+    color: var(--gold-bright);
+    text-align: center;
+    margin: 0 0 0.5em;
+    letter-spacing: 0.02em;
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid var(--gold-dim);
+    position: relative;
+}
+
+.hint-text {
+    font-size: clamp(7px, 1vw, 10px);
+    color: var(--parchment-dark);
+    opacity: 0.75;
+    line-height: 1.4;
+    margin-top: auto;
+}
+
+.last-landed {
+    margin-top: auto;
+    padding-top: 0.5em;
+    border-top: 1px solid var(--gold-dim);
+    min-height: 0; /* حتى flexbox يسمح للمحتوى يتقلص ويتمرر بدل ما يفيض */
+}
+.last-landed .panel-title { margin-bottom: 0.4em; }
+.event-log-content {
+    background: rgba(0,0,0,0.28);
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    padding: clamp(5px, 1vh, 9px);
+    font-size: clamp(7.5px, 1.1vw, 10px);
+    color: var(--parchment);
+    line-height: 1.6;
+    min-height: 2.4em;
+    max-height: 22vh;
+    overflow-y: auto;
+}
+.event-log-content .log-entry {
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 0.2em 0;
+}
+.event-log-content .log-entry:last-child { border-bottom: none; }
+
+/* تنبيهات منبثقة (toast) بدل alert() المزعجة */
+#toast-container {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4em;
+    pointer-events: none;
+    width: 100%;
+    padding: 0 1em;
+}
+.toast {
+    background: var(--maroon-dark);
+    color: var(--parchment);
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    padding: 0.55em 1.1em;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 700;
+    font-size: clamp(10px, 1.5vw, 13px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+    max-width: 90vw;
+    text-align: center;
+    animation: toast-in 0.2s ease, toast-out 0.25s ease 2.75s forwards;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-8px); } }
+
+/* لاعبون */
+.players-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: clamp(4px, 0.8vh, 10px); }
+.player-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    padding: clamp(4px, 0.8vh, 8px);
+    font-size: clamp(9px, 1.3vw, 13px);
+}
+.player-item.active {
+    border-color: var(--gold-bright);
+    box-shadow: 0 0 0 1px var(--gold-bright), 0 0 10px rgba(230, 195, 74, 0.45);
+}
+.player-piece { font-size: clamp(14px, 2vw, 20px); }
+
+/* نرد */
+.dice-tray { display: flex; gap: clamp(6px, 1vw, 12px); justify-content: center; margin: 0.4em 0 0.8em; }
+.die {
+    width: clamp(28px, 4.5vw, 48px);
+    height: clamp(28px, 4.5vw, 48px);
+    background:
+        radial-gradient(circle at 30% 25%, rgba(255,255,255,0.6), transparent 45%),
+        var(--parchment);
+    color: var(--ink);
+    border: 1px solid var(--gold-dim);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: clamp(14px, 2.2vw, 22px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    transition: transform 0.15s ease;
+}
+.die.rolling { animation: shake 0.5s ease; }
+@keyframes shake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-18deg) scale(1.05); }
+    50% { transform: rotate(14deg) scale(1.05); }
+    75% { transform: rotate(-10deg); }
+}
+
+.wood-btn {
+    font-family: 'Cairo', sans-serif;
+    font-weight: 700;
+    font-size: clamp(9px, 1.3vw, 13px);
+    color: var(--parchment);
+    background: linear-gradient(180deg, var(--maroon-bright), var(--maroon-dark) 75%);
+    border: 1px solid var(--gold);
+    border-radius: 16px 16px 6px 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 2px 6px rgba(0,0,0,0.45);
+    padding: clamp(6px, 1vh, 10px) 0.5em;
+    margin-bottom: clamp(4px, 0.8vh, 8px);
+    cursor: pointer;
+}
+.wood-btn:active { transform: translateY(1px); }
+.wood-btn.secondary {
+    background: linear-gradient(180deg, #6b7a45, var(--olive) 75%);
+    margin-top: auto;
+}
+
+/* ---------- اللوح ---------- */
+.board-wrapper {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: clamp(2px, 0.6vh, 8px);
+}
+
+.board {
+    position: relative;
+    width: min(100%, 100%);
+    height: min(100%, 100%);
+    aspect-ratio: 1 / 1;
+    max-width: 100%;
+    max-height: 100%;
+    padding: clamp(9px, 2.2%, 24px);
+    background: var(--wood-texture);
+    border-radius: 8px;
+    box-shadow:
+        0 0 0 2px var(--gold-dim),
+        0 0 26px rgba(0,0,0,0.55) inset,
+        0 10px 30px rgba(0,0,0,0.6);
+}
+
+.board::before {
+    content: '';
+    position: absolute;
+    inset: clamp(3px, 0.7%, 9px);
+    border: 2px solid var(--gold);
+    border-radius: 5px;
+    background-image: var(--geo-pattern);
+    background-size: 40px 40px;
+    pointer-events: none;
+}
+
+.board-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1.3fr repeat(9, 1fr) 1.3fr;
+    grid-template-rows: 1.3fr repeat(9, 1fr) 1.3fr;
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--gold-dim);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.corner-motif {
+    position: absolute;
+    z-index: 2;
+    bottom: clamp(1px, 0.5%, 6px);
+    width: clamp(18px, 4.6%, 40px);
+    height: clamp(12px, 3.1%, 27px);
+    background-image: var(--dome-motif);
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: 0.85;
+    pointer-events: none;
+}
+.corner-motif--left { left: clamp(1px, 0.5%, 6px); }
+.corner-motif--right { right: clamp(1px, 0.5%, 6px); transform: scaleX(-1); }
+
+.tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    background: var(--parchment);
+    border: 0.5px solid var(--wood-mid);
+    overflow: hidden;
+    padding: 1px 2px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.color-stripe {
+    width: 100%;
+    height: 24%;
+    flex-shrink: 0;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.3), transparent 60%);
+    border-bottom: 1px solid rgba(0,0,0,0.35);
+}
+
+.tile-name {
+    font-family: 'Cairo', sans-serif;
+    font-weight: 700;
+    font-size: clamp(5.5px, 0.85vw, 11px);
+    line-height: 1.12;
+    text-align: center;
+    color: var(--ink);
+    margin-top: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tile-price {
+    font-size: clamp(5px, 0.75vw, 10px);
+    font-weight: 700;
+    color: var(--maroon-dark);
+    margin-top: auto;
+    padding-bottom: 1px;
+}
+
+.tile-icon {
+    font-size: clamp(9px, 1.4vw, 18px);
+    margin-top: auto;
+}
+
+/* طبقة ختم الملكية */
+.tile.owned {
+    box-shadow: inset 0 0 0 2px var(--gold-bright);
+}
+.tile .ownership-stamp {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: clamp(10px, 1.8vw, 17px);
+    height: clamp(10px, 1.8vw, 17px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(6px, 1.2vw, 11px);
+    background: var(--gold-bright);
+    border: 1px solid var(--maroon-dark);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    z-index: 2;
+}
+
+.tile.mortgaged {
+    filter: grayscale(0.75) brightness(0.8);
+}
+.house-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    font-size: clamp(5px, 1vw, 9px);
+    z-index: 2;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.7));
+}
+
+/* قطع اللاعبين فوق خاناتهم */
+.tile-tokens {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    right: 2px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    justify-content: center;
+    pointer-events: none;
+}
+.token {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(13px, 2.4vw, 24px);
+    height: clamp(13px, 2.4vw, 24px);
+    font-size: clamp(8px, 1.6vw, 16px);
+    line-height: 1;
+    background: radial-gradient(circle at 35% 30%, #fffaf0, #f0d060 75%);
+    border: 1.5px solid var(--maroon-dark);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 1px 4px rgba(0,0,0,0.75);
+    animation: token-pop 0.25s ease;
+}
+@keyframes token-pop {
+    from { transform: scale(0.4); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.match-timer {
+    text-align: center;
+    font-weight: 800;
+    font-size: clamp(11px, 1.5vw, 14px);
+    color: var(--parchment);
+    margin-bottom: 0.5em;
+    opacity: 0.9;
+    font-variant-numeric: tabular-nums;
+}
+.match-timer.urgent { color: #ef6b6b; }
+
+.my-balance {
+    position: relative;
+    text-align: center;
+    font-weight: 700;
+    color: var(--gold-bright);
+    font-size: clamp(10px, 1.4vw, 13px);
+    margin-bottom: 0.5em;
+    padding-bottom: 0.4em;
+    border-bottom: 1px solid var(--gold-dim);
+}
+.balance-change {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-weight: 800;
+    font-size: clamp(12px, 1.8vw, 16px);
+    pointer-events: none;
+    animation: balance-float 1.8s ease forwards;
+}
+.balance-change.positive { color: #5fd16a; }
+.balance-change.negative { color: #ef6b6b; }
+@keyframes balance-float {
+    0% { opacity: 0; transform: translate(-50%, 4px); }
+    15% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -24px); }
+}
+
+.turn-status {
+    text-align: center;
+    font-size: clamp(9px, 1.3vw, 12px);
+    color: var(--gold-bright);
+    min-height: 1.4em;
+    margin: 0.3em 0;
+    font-weight: 700;
+}
+
+.wood-btn.danger {
+    background: linear-gradient(180deg, var(--maroon-dark), #2a0a0f 75%);
+    margin-top: auto;
+}
+.wood-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.endvote-actions { display: flex; gap: 0.6em; margin-top: 0.6em; }
+.endvote-actions .wood-btn { flex: 1; margin: 0; }
+
+.card-announce { text-align: center; }
+.card-announce h2 { margin-bottom: 0.6em; }
+.card-announce p { font-size: clamp(13px, 1.8vw, 16px); font-weight: 700; line-height: 1.5; }
+
+.jail-actions { display: flex; flex-direction: column; gap: 0.5em; margin-top: 0.6em; }
+.jail-actions .wood-btn { margin: 0; }
+.jail-actions .hidden { display: none; }
+
+.jail-icon {
+    font-size: clamp(9px, 1.3vw, 12px);
+    margin-right: 0.3em;
+}
+
+.negotiate-card { width: min(85vw, 480px); }
+.neg-label {
+    display: block;
+    font-size: clamp(9px, 1.3vw, 12px);
+    font-weight: 700;
+    color: var(--maroon-dark);
+    margin: 0.5em 0 0.25em;
+}
+#neg-counterpart, .negotiate-col input[type="number"] {
+    width: 100%;
+    font-family: 'Cairo', sans-serif;
+    font-size: clamp(11px, 1.5vw, 14px);
+    padding: 0.4em 0.6em;
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    background: #fffdf7;
+    color: var(--ink);
+}
+.negotiate-columns { display: flex; gap: 0.8em; margin-top: 0.4em; }
+.negotiate-col { flex: 1; min-width: 0; }
+.negotiate-col h3 {
+    font-family: 'Reem Kufi', sans-serif;
+    color: var(--maroon-dark);
+    font-size: clamp(12px, 1.6vw, 15px);
+    margin: 0 0 0.3em;
+    text-align: center;
+}
+.negotiate-col p {
+    font-size: clamp(10px, 1.4vw, 13px);
+    text-align: center;
+    min-height: 1.4em;
+}
+.neg-property-list {
+    max-height: 26vh;
+    overflow-y: auto;
+    border: 1px solid var(--parchment-dark);
+    border-radius: 6px;
+    padding: 0.3em;
+}
+.neg-property-list label {
+    display: block;
+    font-size: clamp(9px, 1.3vw, 12px);
+    padding: 0.2em 0.1em;
+}
+
+.debt-property-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.25em 0.2em;
+    font-size: clamp(9px, 1.3vw, 12px);
+    color: var(--ink);
+}
+.debt-property-row .wood-btn.small { padding: 0.3em 0.7em; margin: 0; flex-shrink: 0; }
+
+/* نتائج نهاية اللعبة */
+.results-card { width: min(85vw, 380px); max-height: 90dvh; overflow-y: auto; }
+.winner-banner { text-align: center; margin: 0.3em 0 1em; }
+.winner-banner .trophy { font-size: clamp(28px, 5vw, 40px); display: block; margin-bottom: 0.15em; }
+.winner-banner .winner-name {
+    display: block;
+    font-family: 'Reem Kufi', sans-serif;
+    font-size: clamp(16px, 2.4vw, 20px);
+    font-weight: 700;
+    color: var(--maroon-dark);
+}
+.winner-banner .winner-value { font-size: clamp(11px, 1.5vw, 14px); color: var(--maroon-dark); }
+
+.results-list { list-style: none; margin: 0 0 1em; padding: 0; display: flex; flex-direction: column; gap: 0.4em; }
+.results-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    background: #fffdf7;
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    padding: 0.5em 0.7em;
+    font-size: clamp(11px, 1.5vw, 14px);
+    color: var(--ink);
+}
+.results-list .medal { font-weight: 800; width: 1.6em; text-align: center; }
+.results-list .res-value { margin-right: auto; font-weight: 800; color: var(--maroon-dark); }
+
+/* التقييم */
+.rating-stars {
+    text-align: center;
+    font-size: clamp(22px, 4vw, 32px);
+    margin: 0.5em 0;
+    cursor: pointer;
+    letter-spacing: 0.15em;
+    direction: ltr;
+}
+.rating-stars span { color: var(--parchment-dark); transition: color 0.15s; }
+.rating-stars span.selected { color: var(--gold); }
+
+.rating-type-picker { display: flex; gap: 0.5em; justify-content: center; margin-bottom: 0.7em; }
+.rating-type-picker .wood-btn.small.active { background: linear-gradient(180deg, var(--maroon-bright), var(--maroon-dark)); }
+
+#rating-text {
+    width: 100%;
+    min-height: 4em;
+    font-family: 'Cairo', sans-serif;
+    font-size: clamp(11px, 1.5vw, 13px);
+    padding: 0.5em 0.6em;
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    background: #fffdf7;
+    color: var(--ink);
+    margin-bottom: 0.6em;
+    resize: vertical;
+}
+
+.auction-timer {
+    text-align: center;
+    font-size: clamp(20px, 3.5vw, 30px);
+    font-weight: 800;
+    color: var(--maroon-dark);
+    margin: 0.3em 0;
+    font-variant-numeric: tabular-nums;
+}
+.auction-timer.urgent { color: #a5231b; animation: urgent-pulse 0.6s ease infinite; }
+@keyframes urgent-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+}
+
+.board-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background-image: var(--geo-pattern), radial-gradient(circle at center, var(--wood-mid), var(--wood-dark) 75%);
+    background-size: 56px 56px, cover;
+}
+
+.board-title {
+    font-family: 'Reem Kufi', sans-serif;
+    font-size: clamp(20px, 4.6vw, 46px);
+    color: var(--gold-bright);
+    background: linear-gradient(180deg, var(--maroon-bright), var(--maroon-dark) 80%);
+    padding: 0.3em 0.8em;
+    border: 2px solid var(--gold);
+    border-radius: 6px;
+    box-shadow: 0 0 0 3px var(--wood-dark), 0 4px 14px rgba(0,0,0,0.55);
+    transform: rotate(-38deg);
+    white-space: nowrap;
+}
+
+.center-dice-preview {
+    display: none;
+}
+
+.board-error {
+    color: var(--parchment);
+    text-align: center;
+    font-size: clamp(11px, 1.6vw, 15px);
+    padding: 1em;
+}
+
+/* ---------- نافذة بطاقة الأرض ---------- */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+.modal-backdrop.hidden { display: none; }
+
+.property-card, .parchment-card {
+    position: relative;
+    background:
+        radial-gradient(circle at 28% 18%, rgba(255,255,255,0.35), transparent 55%),
+        var(--parchment);
+    color: var(--ink);
+    border: 3px solid var(--gold);
+    border-radius: 10px;
+    box-shadow: 0 0 0 6px var(--wood-dark), 0 12px 34px rgba(0,0,0,0.6);
+    padding: 1.2em 1.4em;
+}
+.property-card {
+    width: min(80vw, 320px);
+    max-height: 86dvh;
+    overflow-y: auto;
+}
+.property-card h2 {
+    font-family: 'Reem Kufi', sans-serif;
+    color: var(--maroon-dark);
+    text-align: center;
+    margin: 0 0 0.5em;
+    font-size: clamp(15px, 2vw, 20px);
+}
+.card-price { text-align: center; font-weight: 700; margin-bottom: 0.6em; font-size: clamp(11px, 1.6vw, 14px); }
+.rent-table { width: 100%; border-collapse: collapse; font-size: clamp(10px, 1.5vw, 13px); }
+.rent-table td { padding: 0.3em 0.4em; border-bottom: 1px solid var(--parchment-dark); }
+.rent-table td:last-child { text-align: left; font-weight: 700; color: var(--maroon-dark); }
+.rent-table tr.current-rent { background: rgba(201, 162, 39, 0.35); }
+
+.close-btn {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--maroon-dark);
+    cursor: pointer;
+}
+
+.rules-content { width: min(88vw, 460px); max-height: 90dvh; overflow-y: auto; text-align: right; }
+.rules-content h2 { text-align: center; }
+.rules-content h3 {
+    font-family: 'Reem Kufi', sans-serif;
+    color: var(--maroon-dark);
+    font-size: clamp(13px, 1.8vw, 16px);
+    margin: 0.9em 0 0.35em;
+    border-bottom: 1px solid var(--gold-dim);
+    padding-bottom: 0.2em;
+}
+.rules-content h3:first-of-type { margin-top: 0.3em; }
+.rules-content p, .rules-content li {
+    font-size: clamp(10.5px, 1.4vw, 13px);
+    line-height: 1.6;
+    color: var(--ink);
+}
+.rules-content ul { margin: 0; padding-right: 1.2em; }
+.rules-content li { margin-bottom: 0.35em; }
+
+/* ---------- شاشة البداية ---------- */
+.landing-card {
+    text-align: center;
+    width: min(70vw, 380px);
+    max-height: 90dvh;
+    overflow-y: auto;
+}
+.landing-title {
+    font-family: 'Reem Kufi', sans-serif;
+    color: var(--maroon-dark);
+    font-size: clamp(20px, 3.4vw, 32px);
+    margin: 0 0 0.8em;
+}
+.landing-actions { display: flex; flex-direction: column; gap: 0.6em; margin-bottom: 0.8em; }
+
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--maroon-dark);
+    text-decoration: underline;
+    font-family: 'Cairo', sans-serif;
+    font-size: clamp(10px, 1.4vw, 13px);
+    cursor: pointer;
+    padding: 0.3em;
+}
+
+/* ---------- نماذج الإنشاء والدخول وغرفة الانتظار ---------- */
+.form-card {
+    position: relative;
+    width: min(78vw, 380px);
+    max-height: 92dvh;
+    overflow-y: auto;
+    text-align: right;
+}
+.form-card h2 {
+    font-family: 'Reem Kufi', sans-serif;
+    color: var(--maroon-dark);
+    text-align: center;
+    margin: 0 0 0.7em;
+    font-size: clamp(16px, 2.2vw, 22px);
+}
+.form-card label {
+    display: block;
+    font-size: clamp(10px, 1.4vw, 13px);
+    font-weight: 700;
+    color: var(--maroon-dark);
+    margin: 0.7em 0 0.3em;
+}
+.form-card input[type="text"] {
+    width: 100%;
+    font-family: 'Cairo', sans-serif;
+    font-size: clamp(12px, 1.6vw, 15px);
+    padding: 0.5em 0.7em;
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    background: #fffdf7;
+    color: var(--ink);
+}
+.form-card .back-btn {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    color: var(--maroon-dark);
+    cursor: pointer;
+}
+.form-error {
+    color: var(--maroon-dark);
+    font-weight: 700;
+    font-size: clamp(10px, 1.4vw, 12px);
+    min-height: 1.4em;
+    text-align: center;
+    margin: 0.4em 0 0;
+}
+
+.piece-picker { display: flex; flex-wrap: wrap; gap: 0.4em; justify-content: center; }
+.piece-option {
+    width: clamp(34px, 6vw, 44px);
+    height: clamp(34px, 6vw, 44px);
+    font-size: clamp(16px, 2.6vw, 22px);
+    background: #fffdf7;
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.piece-option.selected {
+    border-color: var(--maroon-bright);
+    box-shadow: 0 0 0 2px var(--maroon-bright);
+    background: #fff6e6;
+}
+.piece-option:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.count-picker { display: flex; gap: 0.5em; justify-content: center; }
+.count-btn {
+    width: clamp(32px, 5vw, 40px);
+    height: clamp(32px, 5vw, 40px);
+    font-weight: 700;
+    font-family: 'Cairo', sans-serif;
+    background: #fffdf7;
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    cursor: pointer;
+}
+.count-btn.active {
+    background: var(--maroon-bright);
+    color: var(--parchment);
+    border-color: var(--maroon-dark);
+}
+
+.code-input { display: flex; gap: 0.5em; justify-content: center; direction: ltr; }
+.code-box {
+    width: clamp(32px, 6vw, 44px);
+    height: clamp(38px, 7vw, 52px);
+    text-align: center;
+    font-size: clamp(16px, 2.6vw, 22px);
+    font-weight: 800;
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    background: #fffdf7;
+    color: var(--ink);
+}
+
+.room-code-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7em;
+}
+.room-code-display span {
+    font-size: clamp(22px, 3.4vw, 32px);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--maroon-dark);
+}
+
+.lobby-players { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4em; }
+.lobby-players .player-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    background: #fffdf7;
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    padding: 0.5em 0.7em;
+    font-size: clamp(11px, 1.5vw, 14px);
+    color: var(--ink);
+}
+.lobby-players .player-item.empty { color: var(--parchment-dark); background: transparent; border-style: dashed; justify-content: center; }
+.lobby-players .player-item.disconnected { opacity: 0.55; }
+.host-badge, .disconnected-badge {
+    margin-left: auto;
+    font-size: clamp(8px, 1.1vw, 10px);
+    padding: 0.15em 0.5em;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+.host-badge { background: var(--gold); color: var(--wood-dark); font-weight: 700; }
+.disconnected-badge { background: var(--maroon-dark); color: var(--parchment); }
+
+.wood-btn.large { font-size: clamp(12px, 1.7vw, 16px); padding: 0.7em 1em; }
+.wood-btn.primary { background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim)); color: var(--ink); }
+.wood-btn.small { font-size: clamp(9px, 1.2vw, 11px); padding: 0.4em 0.7em; margin: 0; }

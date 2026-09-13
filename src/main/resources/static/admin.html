@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة إدارة مونوبولي بالبلد</title>
+<style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1b120a; color: #eee; padding: 2em; margin: 0; }
+    h1 { color: #d9b64d; }
+    .key-bar { display: flex; gap: 0.5em; margin-bottom: 1.5em; max-width: 420px; }
+    input, button { font-size: 15px; padding: 0.5em 0.8em; border-radius: 6px; border: 1px solid #665; }
+    input { flex: 1; background: #2a1d10; color: #eee; }
+    button { background: #6d1f2b; color: #fff; border: none; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { padding: 0.6em 0.8em; text-align: right; border-bottom: 1px solid #443; font-size: 14px; }
+    th { color: #d9b64d; }
+    .stars { color: #d9b64d; white-space: nowrap; }
+    #error { color: #f66; margin-top: 0.6em; }
+    #empty { opacity: 0.6; margin-top: 1em; }
+</style>
+</head>
+<body>
+
+<h1>لوحة إدارة مونوبولي بالبلد</h1>
+<div class="key-bar">
+    <input type="password" id="key" placeholder="مفتاح الإدارة (admin.key)">
+    <button id="load-btn">عرض التقييمات</button>
+</div>
+<p id="error"></p>
+<p id="empty" style="display:none">ما في تقييمات إلها لسا.</p>
+<table id="table" style="display:none">
+    <thead>
+        <tr><th>التاريخ</th><th>الغرفة</th><th>التقييم</th><th>النوع</th><th>الملاحظة</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+</table>
+
+<script>
+document.getElementById('load-btn').addEventListener('click', load);
+document.getElementById('key').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
+
+const TYPE_LABELS = { SUGGESTION: 'اقتراح', PROBLEM: 'مشكلة', NOTE: 'ملاحظة' };
+
+async function load() {
+    const key = document.getElementById('key').value;
+    const errorEl = document.getElementById('error');
+    errorEl.textContent = '';
+    try {
+        const res = await fetch('/api/admin/ratings?key=' + encodeURIComponent(key));
+        if (!res.ok) {
+            errorEl.textContent = res.status === 403 ? 'مفتاح خاطئ' : 'صار في خطأ';
+            return;
+        }
+        const ratings = await res.json();
+        const table = document.getElementById('table');
+        const empty = document.getElementById('empty');
+        const rows = document.getElementById('rows');
+        rows.innerHTML = '';
+
+        if (ratings.length === 0) {
+            table.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+        table.style.display = 'table';
+
+        ratings.forEach(r => {
+            const tr = document.createElement('tr');
+            const date = new Date(r.submittedAt).toLocaleString('ar');
+            tr.innerHTML =
+                '<td>' + date + '</td>' +
+                '<td>' + escapeHtml(r.roomCode || '') + '</td>' +
+                '<td class="stars">' + '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars) + '</td>' +
+                '<td>' + (TYPE_LABELS[r.type] || r.type || '') + '</td>' +
+                '<td>' + escapeHtml(r.text || '') + '</td>';
+            rows.appendChild(tr);
+        });
+    } catch (e) {
+        errorEl.textContent = 'تعذّر الاتصال بالسيرفر';
+    }
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+</script>
+</body>
+</html>
