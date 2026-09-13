@@ -333,7 +333,7 @@ const TOKEN_STEP_MS = 140;
 function animateTokenMovement(playerId, fromPos, toPos, teleport) {
     if (teleport || fromPos == null || fromPos === toPos) {
         placeTokenAt(playerId, toPos);
-        return;
+        return 0;
     }
     const path = [];
     let cur = fromPos;
@@ -356,6 +356,7 @@ function animateTokenMovement(playerId, fromPos, toPos, teleport) {
         setTimeout(step, TOKEN_STEP_MS);
     }
     step();
+    return path.length * TOKEN_STEP_MS; // مدة الأنيميشن الكلية، حتى نعرف قد إيش ننتظر
 }
 
 // ---- ضغطة طويلة (موبايل/تابلت) أو كبسة (ديسكتوب) لفتح بطاقة الأرض ----
@@ -565,8 +566,9 @@ function highlightCurrentTurn() {
 // ---------- مؤشر الدور والمؤقت والنرد ----------
 let lastPlayedDiceSignature = null;
 
-function renderTurnUI() {
+function renderTurnUI(actionDelayMs) {
     if (!gameState) return;
+    actionDelayMs = actionDelayMs || 0;
 
     if (gameState.lastDie1) {
         // نستخدم توقيت مهلة الدور كجزء من "بصمة" الرمية، حتى نميّز رميتين
@@ -616,11 +618,24 @@ function renderTurnUI() {
     highlightCurrentTurn();
     renderTokens();
     renderOwnershipStamps();
-    renderPurchaseModal();
     renderAuctionModal();
-    renderJailModal();
-    renderDebtModal();
-    renderCardAnnouncement();
+
+    // نتيجة الوقوف على الخانة (بطاقة/شراء/دين/مسكوبية) بتستنى لحد ما توصل
+    // القطعة فعليًا + نص ثانية زيادة، حتى ما تطلع النافذة قبل ما اللاعب
+    // يشوف القطعة نفسها وصلت. أي استدعاء تاني (رد فعل مباشر على ضغطة
+    // المستخدم، مش نتيجة حركة) بيوصل actionDelayMs=0 فبيترسم فورًا زي العادة.
+    const showLandingActions = () => {
+        renderPurchaseModal();
+        renderJailModal();
+        renderDebtModal();
+        renderCardAnnouncement();
+    };
+    if (actionDelayMs > 0) {
+        setTimeout(showLandingActions, actionDelayMs);
+    } else {
+        showLandingActions();
+    }
+
     renderNegotiateButton();
     renderNegotiationStatus();
     renderExtendVoteModal();
@@ -1160,8 +1175,8 @@ async function refreshGameState() {
             // كأنها بطاقة جديدة رغم إنها ممكن تكون قديمة من قبل ما رجعنا.
             lastSeenCard = gameState.lastCardText;
         }
-        detectAndRenderLastLanded(gameState.positions);
-        renderTurnUI();
+        const actionDelayMs = detectAndRenderLastLanded(gameState.positions);
+        renderTurnUI(actionDelayMs);
     } catch (e) { console.error(e); }
 }
 
@@ -1393,19 +1408,24 @@ document.getElementById('card-modal').addEventListener('click', (e) => {
 });
 
 // ---------- كشف حركة اللاعبين (لتحريك القطع بالأنيميشن) ----------
+const POST_ARRIVAL_BUFFER_MS = 500; // نص ثانية إضافية بعد ما توصل القطعة، قبل ما نظهر نتيجة الوقوف
+
 function detectAndRenderLastLanded(positions) {
-    if (!positions) return;
+    if (!positions) return 0;
+    let maxDuration = 0;
     if (previousPositions) {
         for (const pid in positions) {
             if (positions[pid] !== previousPositions[pid]) {
                 const JAIL_POSITION = 10;
                 const sentToJail = positions[pid] === JAIL_POSITION
                     && gameState.inJail && gameState.inJail[pid];
-                animateTokenMovement(pid, previousPositions[pid], positions[pid], sentToJail);
+                const duration = animateTokenMovement(pid, previousPositions[pid], positions[pid], sentToJail);
+                maxDuration = Math.max(maxDuration, duration);
             }
         }
     }
     previousPositions = Object.assign({}, positions);
+    return maxDuration > 0 ? maxDuration + POST_ARRIVAL_BUFFER_MS : 0;
 }
 
 // ---------- سجل الأحداث (تحت لوحة اللاعبين) ----------
@@ -1434,9 +1454,13 @@ window.startBoardGame = function (players, playerId, code) {
 // room.js بينادي هاي كل ما توصل حالة لعبة جديدة عبر WebSocket
 window.onGameStateUpdate = function (state) {
     gameState = state;
-    detectAndRenderLastLanded(state.positions);
-    renderTurnUI();
-    refreshMyBalance();
+    const actionDelayMs = detectAndRenderLastLanded(state.positions);
+    renderTurnUI(actionDelayMs);
+    if (actionDelayMs > 0) {
+        setTimeout(refreshMyBalance, actionDelayMs);
+    } else {
+        refreshMyBalance();
+    }
 };
 
 // room.js بينادي هاي لما تتحدث حالة الغرفة (اتصال/انقطاع) أثناء اللعب
