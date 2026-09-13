@@ -295,36 +295,56 @@ function renderTokens() {
             if (!animatingPlayers.has(child.dataset.player)) child.remove();
         });
     });
-    if (!gameState) return;
-    myPlayers.forEach(p => {
-        if (animatingPlayers.has(p.id)) return; // الأنيميشن بتدير قطعته لحالها
-        const pos = gameState.positions ? gameState.positions[p.id] : undefined;
-        if (pos == null) return;
-        const tile = tilesByPosition[pos];
-        const container = tile && tile.querySelector('.tile-tokens');
-        if (!container) return;
-        const span = document.createElement('span');
-        span.className = 'token';
-        span.textContent = PIECE_ICONS[p.piece] || '●';
-        span.title = p.name;
-        span.dataset.player = p.id;
-        container.appendChild(span);
-    });
+    if (gameState) {
+        myPlayers.forEach(p => {
+            if (animatingPlayers.has(p.id)) return; // الأنيميشن بتدير قطعته لحالها
+            const pos = gameState.positions ? gameState.positions[p.id] : undefined;
+            if (pos == null) return;
+            const tile = tilesByPosition[pos];
+            const container = tile && tile.querySelector('.tile-tokens');
+            if (!container) return;
+            const span = document.createElement('span');
+            span.className = 'token';
+            span.textContent = PIECE_ICONS[p.piece] || '●';
+            span.title = p.name;
+            span.dataset.player = p.id;
+            container.appendChild(span);
+        });
+    }
+    Object.values(tilesByPosition).forEach(updateTileOccupiedHighlight);
+}
+
+/** يضيف/يشيل توهج الخانة حسب وجود قطعة لاعب فوقها هلق. */
+function updateTileOccupiedHighlight(tile) {
+    if (!tile) return;
+    const container = tile.querySelector('.tile-tokens');
+    const hasTokens = !!(container && container.children.length > 0);
+    tile.classList.toggle('tile-occupied', hasTokens);
 }
 
 /** يحط قطعة لاعب واحد بخانة محددة، ويشيلها من أي مكان قديم كانت فيه. */
 function placeTokenAt(playerId, position) {
-    document.querySelectorAll('.token[data-player="' + playerId + '"]').forEach(el => el.remove());
+    const oldTiles = new Set();
+    document.querySelectorAll('.token[data-player="' + playerId + '"]').forEach(el => {
+        const oldTile = el.closest('.tile');
+        if (oldTile) oldTiles.add(oldTile);
+        el.remove();
+    });
+
     const tile = tilesByPosition[position];
     const container = tile && tile.querySelector('.tile-tokens');
     const player = myPlayers.find(p => p.id === playerId);
-    if (!container || !player) return;
-    const span = document.createElement('span');
-    span.className = 'token';
-    span.textContent = PIECE_ICONS[player.piece] || '●';
-    span.title = player.name;
-    span.dataset.player = playerId;
-    container.appendChild(span);
+    if (container && player) {
+        const span = document.createElement('span');
+        span.className = 'token';
+        span.textContent = PIECE_ICONS[player.piece] || '●';
+        span.title = player.name;
+        span.dataset.player = playerId;
+        container.appendChild(span);
+    }
+
+    oldTiles.forEach(updateTileOccupiedHighlight);
+    if (tile) updateTileOccupiedHighlight(tile);
 }
 
 const TOKEN_STEP_MS = 140;
