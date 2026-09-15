@@ -163,6 +163,8 @@ public class GameService {
     private void sendToJail(GameState state, Room room, String playerId) {
         state.getPositions().put(playerId, JAIL_POSITION);
         state.getInJail().put(playerId, true);
+        state.setLastJailPlayerId(playerId);
+        state.setLastJailSeq(state.getLastJailSeq() + 1);
         logEvent(state, playerName(room, playerId) + " راح عالمسكوبية 🔒");
     }
 
@@ -305,19 +307,15 @@ public class GameService {
                 state.getJailFreeCards().merge(playerId, 1, Integer::sum);
                 finishDecision(state, room, advanceAfter);
             }
-            case GO_TO_JAIL -> {
-                sendToJail(state, room, playerId);
-                finishDecision(state, room, true);
-            }
             case GATE_CLOSED -> {
                 state.getSkipNextTurn().put(playerId, true);
                 finishDecision(state, room, advanceAfter);
             }
-            case MOVE_TO, MOVE_RELATIVE -> {
+            case GO_TO_JAIL, MOVE_TO, MOVE_RELATIVE -> {
                 // منوقف هون: نخلي اللاعب يبين لسا واقف عالبطاقة (مع نصها)
                 // بهاد البث، وبعد فترة قصيرة الفحص الدوري بينفذ الحركة
                 // الفعلية وبيبث تاني - حتى القطعة توصل فعلًا للبطاقة أول
-                // بدل ما تقفز مباشرة لنتيجة الحركة الإضافية.
+                // بدل ما تقفز/ترسل مباشرة قبل ما تظهر البطاقة أصلًا.
                 state.setPendingCardMove(new PendingCardMove(playerId, card, diceSum, advanceAfter,
                         Instant.now().plusSeconds(CARD_MOVE_DELAY_SECONDS)));
             }
@@ -332,12 +330,16 @@ public class GameService {
         Card card = pcm.getCard();
         String playerId = pcm.getPlayerId();
 
-        if (card.type() == CardEffectType.MOVE_TO) {
+        if (card.type() == CardEffectType.GO_TO_JAIL) {
+            sendToJail(state, room, playerId);
+            finishDecision(state, room, true);
+        } else if (card.type() == CardEffectType.MOVE_TO) {
             moveToPosition(state, room, playerId, card.targetPosition());
+            resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
         } else {
             moveRelative(state, room, playerId, card.steps());
+            resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
         }
-        resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
     }
 
     private void moveToPosition(GameState state, Room room, String playerId, int target) {
@@ -735,12 +737,18 @@ public class GameService {
             PendingDebt debt = state.getPendingDebt();
             if (debt == null || !debt.getPlayerId().equals(playerId)) throw bad("ما في دين معلق إلك هلأ");
 
-            executeBankruptcy(state, playerId, debt.getCreditorId());
-            logEvent(state, playerName(room, playerId) + " أعلن إفلاسه وطلع من اللعبة 💔");
-            state.setPendingDebt(null);
-            removePlayerFromTurnOrder(state, room, playerId);
+            state.setPendingDebt(null); // نمسحه أول، حتى لو صار خطأ غير متوقع بالتنفيذ ما يضل عالق لحدا
+            RuntimeException failure = null;
+            try {
+                executeBankruptcy(state, playerId, debt.getCreditorId());
+                logEvent(state, playerName(room, playerId) + " أعلن إفلاسه وطلع من اللعبة 💔");
+                removePlayerFromTurnOrder(state, room, playerId);
+            } catch (RuntimeException e) {
+                failure = e;
+            }
 
             broadcast(code, state);
+            if (failure != null) throw failure;
             return state;
         }
     }
@@ -787,6 +795,8 @@ public class GameService {
         List<String> order = state.getTurnOrder();
         int idx = order.indexOf(bankruptPlayerId);
         if (idx == -1) return;
+
+        int oldCurrentIndex = state.getCurrentTurnIndex();
         order.remove(idx);
 
         if (order.size() <= 1) {
@@ -796,11 +806,21 @@ public class GameService {
             }
             return;
         }
-        if (state.getCurrentTurnIndex() >= order.size()) {
-            state.setCurrentTurnIndex(0);
+
+        // نحسب الفهرس الجديد بشكل عام (مش بافتراض إنه اللاعب المفلس
+        // دايمًا بنفس فهرس الدور الحالي بالضبط)، حتى نتجنب أي احتمال
+        // يوصل الدور لفهرس غلط ويعلّق اللعبة.
+        int newCurrentIndex;
+        if (idx < oldCurrentIndex) {
+            newCurrentIndex = oldCurrentIndex - 1;
+        } else if (idx == oldCurrentIndex) {
+            newCurrentIndex = oldCurrentIndex; // نفس الفهرس صار يشاور تلقائيًا على اللاعب التالي
+        } else {
+            newCurrentIndex = oldCurrentIndex;
         }
-        // idx == currentTurnIndex دايمًا هون (الإفلاس بيصير بدور اللاعب
-        // نفسه بس)، فبعد الحذف نفس الفهرس صار يشاور تلقائيًا على التالي.
+        if (newCurrentIndex >= order.size() || newCurrentIndex < 0) newCurrentIndex = 0;
+        state.setCurrentTurnIndex(newCurrentIndex);
+
         String candidateId = order.get(state.getCurrentTurnIndex());
         boolean connected = room.getPlayers().stream()
                 .filter(p -> p.getId().equals(candidateId))
@@ -826,6 +846,8 @@ public class GameService {
         autoRaiseFundsByMortgaging(state, playerId, debt.getAmountOwed());
 
         Integer balance = state.getBalances().get(playerId);
+        state.setPendingDebt(null); // نمسحه هون قبل أي مسار، حتى لو صار خطأ غير متوقع ما يضل عالق
+
         if (balance != null && balance >= debt.getAmountOwed()) {
             state.getBalances().merge(playerId, -debt.getAmountOwed(), Integer::sum);
             if (debt.getCreditorId() != null) {
@@ -833,12 +855,10 @@ public class GameService {
             }
             logEvent(state, playerName(room, playerId) + " سدد دين ₪" + debt.getAmountOwed() + " تلقائيًا (هدم/رهن بدون قرار بالوقت)");
             boolean advanceAfter = debt.isAdvanceTurnAfter();
-            state.setPendingDebt(null);
             finishDecision(state, room, advanceAfter);
         } else {
             executeBankruptcy(state, playerId, debt.getCreditorId());
             logEvent(state, playerName(room, playerId) + " أعلن إفلاسه تلقائيًا (ما قرر بالوقت) وطلع من اللعبة 💔");
-            state.setPendingDebt(null);
             removePlayerFromTurnOrder(state, room, playerId);
         }
     }
@@ -883,12 +903,6 @@ public class GameService {
 
     // ---------------- التفاوض والتداول ----------------
 
-    private boolean allPurchasableSquaresOwned(GameState state) {
-        return BoardData.SQUARES.stream()
-                .filter(s -> s.type() == SquareType.PROPERTY || s.type() == SquareType.UTILITY)
-                .allMatch(s -> state.getOwnership().containsKey(s.position()));
-    }
-
     public GameState proposeTrade(String code, String playerId, String counterpartId,
                                   int offerCash, List<Integer> offerProperties,
                                   int requestCash, List<Integer> requestProperties) {
@@ -896,9 +910,6 @@ public class GameService {
         GameState state = getStateOrThrow(code);
         synchronized (state) {
             if (state.isEnded()) throw bad("اللعبة خلصت");
-            if (!allPurchasableSquaresOwned(state)) {
-                throw bad("التفاوض ما بيصير متاح إلا بعد ما تنباع كل الأراضي والمرافق");
-            }
             if (!state.currentPlayerId().equals(playerId)) throw bad("بس صاحب الدور الحالي يقدر يفتح تفاوض");
             if (state.isHasRolledThisTurn()) throw bad("لازم تفتح التفاوض قبل ما ترمي النرد هاد الدور");
             if (state.isNegotiationUsedThisTurn()) throw bad("عرض تفاوض واحد بس مسموح بكل دور");
@@ -1161,7 +1172,8 @@ public class GameService {
                     }
                 }
             } catch (Exception e) {
-                // ما منوقف فحص باقي الغرف بسبب مشكلة بغرفة وحدة
+                // ما منوقف فحص باقي الغرف بسبب مشكلة بغرفة وحدة، بس نسجلها
+                e.printStackTrace();
             }
         });
     }

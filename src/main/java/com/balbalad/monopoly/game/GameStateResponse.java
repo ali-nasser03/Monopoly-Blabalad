@@ -33,6 +33,8 @@ public record GameStateResponse(
         boolean canNegotiate,
         String lastCardText,
         String lastCardDeck,
+        String lastJailPlayerId,
+        long lastJailSeq,
         boolean ended,
         boolean voteActive,
         Map<String, Boolean> voteResponses,
@@ -79,10 +81,7 @@ public record GameStateResponse(
             PendingDebt d = s.getPendingDebt();
             debtView = new PendingDebtView(d.getPlayerId(), d.getCreditorId(), d.getAmountOwed(), d.getDeadline().toEpochMilli());
         }
-        boolean canNegotiate = com.balbalad.monopoly.board.BoardData.SQUARES.stream()
-                .filter(sq -> sq.type() == com.balbalad.monopoly.board.SquareType.PROPERTY
-                        || sq.type() == com.balbalad.monopoly.board.SquareType.UTILITY)
-                .allMatch(sq -> s.getOwnership().containsKey(sq.position()));
+        boolean canNegotiate = true; // متاح من أول اللعبة، بلا شرط بيع كل الأراضي
 
         Map<String, Integer> finalValues = null;
         String winnerId = null;
@@ -120,6 +119,8 @@ public record GameStateResponse(
                 canNegotiate,
                 s.getLastCardText(),
                 s.getLastCardDeck() == null ? null : s.getLastCardDeck().name(),
+                s.getLastJailPlayerId(),
+                s.getLastJailSeq(),
                 s.isEnded(),
                 s.isVoteActive(),
                 Map.copyOf(s.getVoteResponses()),

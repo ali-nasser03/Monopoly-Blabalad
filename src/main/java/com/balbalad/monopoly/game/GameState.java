@@ -38,6 +38,8 @@ public class GameState {
     private final List<Card> gateDiscard = new ArrayList<>();
     private String lastCardText;
     private CardDeckType lastCardDeck;
+    private String lastJailPlayerId;
+    private long lastJailSeq = 0;
 
     private PendingPurchase pendingPurchase;
     private AuctionState auction;
@@ -113,6 +115,10 @@ public class GameState {
     public String getLastCardText() { return lastCardText; }
     public CardDeckType getLastCardDeck() { return lastCardDeck; }
     public void setLastCard(String text, CardDeckType deck) { this.lastCardText = text; this.lastCardDeck = deck; }
+    public String getLastJailPlayerId() { return lastJailPlayerId; }
+    public void setLastJailPlayerId(String id) { this.lastJailPlayerId = id; }
+    public long getLastJailSeq() { return lastJailSeq; }
+    public void setLastJailSeq(long seq) { this.lastJailSeq = seq; }
 
     public PendingPurchase getPendingPurchase() { return pendingPurchase; }
     public void setPendingPurchase(PendingPurchase p) { this.pendingPurchase = p; }

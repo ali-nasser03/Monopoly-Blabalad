@@ -160,6 +160,7 @@ let myBalance = 1500;
 let lastKnownBalance = null; // لمقارنة الرصيد الجديد بالقديم وعرض +/- مؤقتًا
 let previousPositions = null; // آخر مواقع معروفة لكل اللاعبين، لكشف مين تحرك أخيرًا
 let lastSeenCard = null; // نص آخر بطاقة عرضناها، حتى ما نكرر نفس الإعلان
+let lastSeenJailSeq = null; // آخر معرّف حدث مسكوبية شوهد، حتى ما نكرر نفس التنبيه
 let cardHideTimeout = null;
 let countdownInterval = null;
 let auctionCountdownInterval = null;
@@ -649,6 +650,7 @@ function renderTurnUI(actionDelayMs) {
         renderJailModal();
         renderDebtModal();
         renderCardAnnouncement();
+        checkJailAlert();
     };
     if (actionDelayMs > 0) {
         setTimeout(showLandingActions, actionDelayMs);
@@ -1116,6 +1118,31 @@ function renderCardAnnouncement() {
     modal.classList.remove('hidden');
     clearTimeout(cardHideTimeout);
     cardHideTimeout = setTimeout(() => modal.classList.add('hidden'), 4000);
+}
+
+// ---------- تنبيه المسكوبية (لكل اللاعبين، بأي طريقة وصل فيها) ----------
+let jailAlertTimeout = null;
+
+function checkJailAlert() {
+    if (!gameState || gameState.lastJailSeq == null) return;
+    if (lastSeenJailSeq === null) {
+        lastSeenJailSeq = gameState.lastJailSeq; // أول تحميل/عودة: نثبت بصمت بدون ما نعرض تنبيه قديم
+        return;
+    }
+    if (gameState.lastJailSeq === lastSeenJailSeq) return;
+    lastSeenJailSeq = gameState.lastJailSeq;
+
+    const player = myPlayers.find(p => p.id === gameState.lastJailPlayerId);
+    const name = player ? player.name : 'لاعب';
+    showJailAlert(name + ' راح عالمسكوبية 🔒');
+}
+
+function showJailAlert(text) {
+    document.getElementById('jail-alert-text').textContent = text;
+    const banner = document.getElementById('jail-alert-banner');
+    banner.classList.remove('hidden');
+    clearTimeout(jailAlertTimeout);
+    jailAlertTimeout = setTimeout(() => banner.classList.add('hidden'), 3800);
 }
 
 function showGameOver() {

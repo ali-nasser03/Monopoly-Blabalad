@@ -186,6 +186,30 @@ html, body {
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-8px); } }
 
+.jail-alert-banner {
+    position: fixed;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(180deg, #c0392b, #7a1414);
+    color: #fff;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 800;
+    font-size: clamp(15px, 2.6vw, 26px);
+    padding: 20px 42px;
+    border: 3px solid #ffd700;
+    border-radius: 14px;
+    box-shadow: 0 0 20px rgba(255,50,50,0.6), 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 700;
+    text-align: center;
+    animation: jail-alert-pulse 0.55s ease-in-out infinite alternate;
+}
+.jail-alert-banner.hidden { display: none; }
+@keyframes jail-alert-pulse {
+    from { box-shadow: 0 0 16px rgba(255,50,50,0.5), 0 10px 30px rgba(0,0,0,0.6); }
+    to { box-shadow: 0 0 44px rgba(255,70,70,0.95), 0 10px 30px rgba(0,0,0,0.6); }
+}
+
 /* لاعبون */
 .players-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: clamp(4px, 0.8vh, 10px); }
 .player-item {
@@ -391,14 +415,15 @@ html, body {
 }
 
 .tile.tile-occupied {
-    outline: 2px solid var(--gold-bright);
-    outline-offset: -1px;
-    z-index: 3;
-    animation: tile-glow-pulse 1.6s ease-in-out infinite;
+    outline: 3px solid #ff3b3b;
+    outline-offset: -2px;
+    z-index: 5;
+    transform: scale(1.12);
+    animation: tile-glow-pulse 1.3s ease-in-out infinite;
 }
 @keyframes tile-glow-pulse {
-    0%, 100% { filter: brightness(1.05); }
-    50% { filter: brightness(1.22); }
+    0%, 100% { filter: brightness(1.05); box-shadow: 0 0 10px 3px rgba(255,59,59,0.5); }
+    50% { filter: brightness(1.25); box-shadow: 0 0 22px 7px rgba(255,59,59,0.9); }
 }
 .house-badge {
     position: absolute;
