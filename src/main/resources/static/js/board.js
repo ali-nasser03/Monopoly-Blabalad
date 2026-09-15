@@ -161,6 +161,7 @@ let lastKnownBalance = null; // لمقارنة الرصيد الجديد بال�
 let previousPositions = null; // آخر مواقع معروفة لكل اللاعبين، لكشف مين تحرك أخيرًا
 let lastSeenCard = null; // نص آخر بطاقة عرضناها، حتى ما نكرر نفس الإعلان
 let lastSeenJailSeq = null; // آخر معرّف حدث مسكوبية شوهد، حتى ما نكرر نفس التنبيه
+let lastSeenBackwardMoveSeq = null; // آخر معرّف حركة للخلف شوهد، حتى ما نطبقها على حركة تانية
 let cardHideTimeout = null;
 let countdownInterval = null;
 let auctionCountdownInterval = null;
@@ -351,15 +352,17 @@ function placeTokenAt(playerId, position) {
 const TOKEN_STEP_MS = 140;
 
 /** يحرك قطعة اللاعب مربع-مربع من fromPos لـ toPos، بدل ما تختفي وتطلع مباشرة. */
-function animateTokenMovement(playerId, fromPos, toPos, teleport) {
+const JAIL_TELEPORT_PAUSE_MS = 1200; // وقفة قبل ما تظهر النتيجة، حتى يلحق اللاعب يشوف إنه انتقل فجأة
+
+function animateTokenMovement(playerId, fromPos, toPos, teleport, backward) {
     if (teleport || fromPos == null || fromPos === toPos) {
         placeTokenAt(playerId, toPos);
-        return 0;
+        return teleport ? JAIL_TELEPORT_PAUSE_MS : 0;
     }
     const path = [];
     let cur = fromPos;
     for (let i = 0; i < 40; i++) {
-        cur = (cur + 1) % 40;
+        cur = backward ? (cur - 1 + 40) % 40 : (cur + 1) % 40;
         path.push(cur);
         if (cur === toPos) break;
     }
@@ -1466,10 +1469,17 @@ function detectAndRenderLastLanded(positions) {
                 const JAIL_POSITION = 10;
                 const sentToJail = positions[pid] === JAIL_POSITION
                     && gameState.inJail && gameState.inJail[pid];
-                const duration = animateTokenMovement(pid, previousPositions[pid], positions[pid], sentToJail);
+                const isBackward = gameState.lastBackwardMovePlayerId === pid
+                    && gameState.lastBackwardMoveSeq != null
+                    && gameState.lastBackwardMoveSeq !== lastSeenBackwardMoveSeq;
+                if (isBackward) lastSeenBackwardMoveSeq = gameState.lastBackwardMoveSeq;
+                const duration = animateTokenMovement(pid, previousPositions[pid], positions[pid], sentToJail, isBackward);
                 maxDuration = Math.max(maxDuration, duration);
             }
         }
+    } else {
+        // أول تحميل/عودة: نثبت بصمت، حتى ما نطبق اتجاه قديم على أول حركة حقيقية نشوفها.
+        lastSeenBackwardMoveSeq = gameState.lastBackwardMoveSeq;
     }
     previousPositions = Object.assign({}, positions);
     return maxDuration > 0 ? maxDuration + POST_ARRIVAL_BUFFER_MS : 0;

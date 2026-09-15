@@ -362,6 +362,9 @@ public class GameService {
         if (steps > 0 && next < old) {
             state.getBalances().merge(playerId, PASS_GO_BONUS, Integer::sum);
         }
+        if (steps < 0) {
+            state.markBackwardMove(playerId);
+        }
         if (next == GO_TO_JAIL_POSITION) {
             sendToJail(state, room, playerId);
         } else {

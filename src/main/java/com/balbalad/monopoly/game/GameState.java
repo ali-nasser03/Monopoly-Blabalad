@@ -40,6 +40,8 @@ public class GameState {
     private CardDeckType lastCardDeck;
     private String lastJailPlayerId;
     private long lastJailSeq = 0;
+    private String lastBackwardMovePlayerId;
+    private long lastBackwardMoveSeq = 0;
 
     private PendingPurchase pendingPurchase;
     private AuctionState auction;
@@ -119,6 +121,12 @@ public class GameState {
     public void setLastJailPlayerId(String id) { this.lastJailPlayerId = id; }
     public long getLastJailSeq() { return lastJailSeq; }
     public void setLastJailSeq(long seq) { this.lastJailSeq = seq; }
+    public String getLastBackwardMovePlayerId() { return lastBackwardMovePlayerId; }
+    public long getLastBackwardMoveSeq() { return lastBackwardMoveSeq; }
+    public void markBackwardMove(String playerId) {
+        this.lastBackwardMovePlayerId = playerId;
+        this.lastBackwardMoveSeq++;
+    }
 
     public PendingPurchase getPendingPurchase() { return pendingPurchase; }
     public void setPendingPurchase(PendingPurchase p) { this.pendingPurchase = p; }
