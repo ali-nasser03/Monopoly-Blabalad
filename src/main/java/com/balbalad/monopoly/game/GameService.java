@@ -849,6 +849,7 @@ public class GameService {
 
         if (order.size() <= 1) {
             state.setEnded(true);
+            state.setCurrentTurnIndex(0); // فهرس آمن دايمًا، حتى لو نادى حدا currentPlayerId() بعدها (زي البث)
             if (order.size() == 1) {
                 logEvent(state, playerName(room, order.get(0)) + " ربح! كل اللاعبين الباقيين أفلسوا 🏆");
             }

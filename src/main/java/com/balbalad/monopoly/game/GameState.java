@@ -92,7 +92,12 @@ public class GameState {
         Collections.shuffle(gateDeck);
     }
 
-    public String currentPlayerId() { return turnOrder.get(currentTurnIndex); }
+    public String currentPlayerId() {
+        if (turnOrder.isEmpty()) return null;
+        int idx = currentTurnIndex;
+        if (idx < 0 || idx >= turnOrder.size()) idx = 0;
+        return turnOrder.get(idx);
+    }
 
     public List<String> getTurnOrder() { return turnOrder; }
     public int getCurrentTurnIndex() { return currentTurnIndex; }
