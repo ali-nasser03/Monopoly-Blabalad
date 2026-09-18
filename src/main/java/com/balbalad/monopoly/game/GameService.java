@@ -58,6 +58,7 @@ public class GameService {
         GameState state = new GameState(order, TURN_SECONDS);
         games.put(room.getCode(), state);
         logEvent(state, "بدأت اللعبة! 🎲");
+        ensureBotThinkingPause(state, room);
         broadcast(room.getCode(), state);
         return state;
     }
@@ -195,6 +196,22 @@ public class GameService {
         state.setHasRolledThisTurn(false);
         state.setNegotiationUsedThisTurn(false);
         state.setTurnDeadline(Instant.now().plusSeconds(TURN_SECONDS));
+        ensureBotThinkingPause(state, room);
+    }
+
+    /**
+     * لو الدور الحالي هلق صار لبوت، منتأكد إنه عنده وقفة تفكير كافية قبل
+     * أول فعل إله - حتى اللاعب الحقيقي يلحق يشوف نتيجة دوره هو (شراء،
+     * إيجار...) قبل ما البث التالي (دور البوت) يوصل ويغطي عليها.
+     */
+    private void ensureBotThinkingPause(GameState state, Room room) {
+        if (state.getTurnOrder().isEmpty()) return;
+        String current = state.getTurnOrder().get(state.getCurrentTurnIndex());
+        if (!isBot(room, current)) return;
+        Instant minStart = Instant.now().plusMillis(BOT_MIN_DELAY_MS + 600);
+        if (state.getNextBotActionAt() == null || state.getNextBotActionAt().isBefore(minStart)) {
+            state.setNextBotActionAt(minStart);
+        }
     }
 
     private void finishDecision(GameState state, Room room, boolean advanceAfter) {
@@ -861,6 +878,7 @@ public class GameService {
             state.setHasRolledThisTurn(false);
             state.setNegotiationUsedThisTurn(false);
             state.setTurnDeadline(Instant.now().plusSeconds(TURN_SECONDS));
+            ensureBotThinkingPause(state, room);
         } else {
             int temp = state.getCurrentTurnIndex();
             state.setCurrentTurnIndex((temp - 1 + order.size()) % order.size());
@@ -1203,11 +1221,169 @@ public class GameService {
                         logEvent(state, "ما اكتمل إجماع التمديد بالوقت - اللعبة انتهت");
                         broadcast(code, state);
                     }
+
+                    maybeTriggerBotAction(state, room, code);
                 }
             } catch (Exception e) {
                 // ما منوقف فحص باقي الغرف بسبب مشكلة بغرفة وحدة، بس نسجلها
                 e.printStackTrace();
             }
         });
+    }
+
+    // ---------------- بوتات (يلعبوا لحالهم ضد اللاعبين الحقيقيين) ----------------
+
+    private static final long BOT_MIN_DELAY_MS = 900;
+    private static final long BOT_MAX_DELAY_MS = 1900;
+
+    /** يفحص هل في بوت لازم يتصرف هلق، وينفذله القرار المناسب بعد وقفة تفكير قصيرة. */
+    private void maybeTriggerBotAction(GameState state, Room room, String code) {
+        if (state.isEnded()) return;
+        Instant now = Instant.now();
+        if (state.getNextBotActionAt() != null && now.isBefore(state.getNextBotActionAt())) return;
+
+        String botId = findActingBotId(state, room);
+        if (botId == null) return;
+
+        performBotAction(state, room, code, botId);
+        long delay = BOT_MIN_DELAY_MS + random.nextInt((int) (BOT_MAX_DELAY_MS - BOT_MIN_DELAY_MS));
+        state.setNextBotActionAt(Instant.now().plusMillis(delay));
+    }
+
+    /** يحدد مين البوت (إذا في) يلي لازم ياخد قرار هلق، بترتيب أولوية يطابق شو بيشوفه لاعب حقيقي. */
+    private String findActingBotId(GameState state, Room room) {
+        if (state.isVoteActive()) {
+            String botId = findUnvotedBot(room, state.getVoteResponses());
+            if (botId != null) return botId;
+        }
+        if (state.isExtendVoteActive()) {
+            String botId = findUnvotedBot(room, state.getExtendVoteResponses());
+            if (botId != null) return botId;
+        }
+        if (state.getPendingDebt() != null && isBot(room, state.getPendingDebt().getPlayerId())) {
+            return state.getPendingDebt().getPlayerId();
+        }
+        if (state.getPendingPurchase() != null && isBot(room, state.getPendingPurchase().getPlayerId())) {
+            return state.getPendingPurchase().getPlayerId();
+        }
+        if (state.getNegotiation() != null && isBot(room, state.getNegotiation().getCounterpartId())) {
+            return state.getNegotiation().getCounterpartId();
+        }
+        // دور عادي (رمي أو قرار مسكوبية) - بس لو ما في أي قرار تاني معلق يوقف الدور.
+        // ملاحظة: ما منتحقق من hasRolledThisTurn هون قصدًا - لو البوت رمى دبل
+        // وصار إله رمية إضافية بنفس دوره، هاد العلم بيضل true وبيمنعه يرمي
+        // تاني غلط، فالدور كان يعلق لحد ما تنتهي مهلة الـ45 ثانية وينعدي قسريًا.
+        if (state.getAuction() == null && state.getPendingPurchase() == null && state.getPendingCardMove() == null
+                && state.getNegotiation() == null && state.getPendingDebt() == null) {
+            String current = state.currentPlayerId();
+            if (current != null && isBot(room, current)) {
+                return current;
+            }
+        }
+        return null;
+    }
+
+    private String findUnvotedBot(Room room, Map<String, Boolean> responses) {
+        return room.getPlayers().stream()
+                .filter(Player::isBot)
+                .map(Player::getId)
+                .filter(id -> !Boolean.TRUE.equals(responses.get(id)))
+                .findFirst().orElse(null);
+    }
+
+    private boolean isBot(Room room, String playerId) {
+        return room.getPlayers().stream().anyMatch(p -> p.getId().equals(playerId) && p.isBot());
+    }
+
+    private void performBotAction(GameState state, Room room, String code, String botId) {
+        if (state.isVoteActive() && !Boolean.TRUE.equals(state.getVoteResponses().get(botId))) {
+            try { respondEndVote(code, botId, true); } catch (RuntimeException ignored) {}
+        } else if (state.isExtendVoteActive() && !Boolean.TRUE.equals(state.getExtendVoteResponses().get(botId))) {
+            try { respondExtendVote(code, botId, true); } catch (RuntimeException ignored) {}
+        } else if (state.getPendingDebt() != null && botId.equals(state.getPendingDebt().getPlayerId())) {
+            botResolveDebt(code, botId);
+        } else if (state.getPendingPurchase() != null && botId.equals(state.getPendingPurchase().getPlayerId())) {
+            botDecidePurchase(code, botId, state);
+        } else if (state.getNegotiation() != null && botId.equals(state.getNegotiation().getCounterpartId())) {
+            botRespondNegotiation(code, botId, state);
+        } else if (Boolean.TRUE.equals(state.getInJail().get(botId))) {
+            botJailDecision(code, botId, state);
+        } else {
+            try {
+                roll(code, botId);
+            } catch (RuntimeException ignored) {
+                // نادرًا ممكن تتغير الحالة بنفس اللحظة (لاعب تاني تصرف) - نتجاهل ونحاول بالدورة الجاية
+            }
+        }
+    }
+
+    /** يشتري لو الرصيد يكفي، وإلا يفتح مزاد بدل ما يخاطر يفضى رصيده. */
+    private void botDecidePurchase(String code, String botId, GameState state) {
+        PendingPurchase pp = state.getPendingPurchase();
+        if (pp == null) return;
+        BoardSquare sq = BoardData.SQUARES.get(pp.getPosition());
+        Integer balance = state.getBalances().get(botId);
+        try {
+            if (balance != null && balance >= sq.price()) {
+                buyPending(code, botId);
+            } else {
+                openAuction(code, botId);
+            }
+        } catch (RuntimeException ignored) {}
+    }
+
+    /** يهدم ويرهن قد ما يلزم (نفس منطق الحل التلقائي)، وبعدين يسدد أو يعلن إفلاسه. */
+    private void botResolveDebt(String code, String botId) {
+        GameState state = getStateOrThrow(code);
+        synchronized (state) {
+            PendingDebt debt = state.getPendingDebt();
+            if (debt == null || !botId.equals(debt.getPlayerId())) return;
+
+            autoRaiseFundsByDemolishing(state, botId, debt.getAmountOwed());
+            autoRaiseFundsByMortgaging(state, botId, debt.getAmountOwed());
+
+            Integer balance = state.getBalances().get(botId);
+            try {
+                if (balance != null && balance >= debt.getAmountOwed()) {
+                    payDebt(code, botId);
+                } else {
+                    declareBankruptcy(code, botId);
+                }
+            } catch (RuntimeException ignored) {}
+        }
+    }
+
+    /** يقبل بس لو قيمة يلي رح ياخدها ≥ قيمة يلي رح يديها، وقادر يدفع المبلغ المطلوب. */
+    private void botRespondNegotiation(String code, String botId, GameState state) {
+        NegotiationSession n = state.getNegotiation();
+        if (n == null || !botId.equals(n.getCounterpartId())) return;
+
+        int giveValue = n.getRequestCash();
+        for (int pos : n.getRequestProperties()) giveValue += BoardData.SQUARES.get(pos).price();
+        int getValue = n.getOfferCash();
+        for (int pos : n.getOfferProperties()) getValue += BoardData.SQUARES.get(pos).price();
+
+        Integer balance = state.getBalances().get(botId);
+        boolean canAfford = balance != null && balance >= n.getRequestCash();
+        boolean fairDeal = getValue >= giveValue;
+
+        try {
+            respondTrade(code, botId, canAfford && fairDeal);
+        } catch (RuntimeException ignored) {}
+    }
+
+    /** بطاقة شحرور لو معه، وإلا يدفع لو رصيده مريح، وإلا يحاول دبل بدل ما يخاطر بالـ50. */
+    private void botJailDecision(String code, String botId, GameState state) {
+        int cards = state.getJailFreeCards().getOrDefault(botId, 0);
+        Integer balance = state.getBalances().get(botId);
+        try {
+            if (cards > 0) {
+                useJailFreeCard(code, botId);
+            } else if (balance != null && balance >= 100) {
+                payBail(code, botId);
+            } else {
+                roll(code, botId);
+            }
+        } catch (RuntimeException ignored) {}
     }
 }

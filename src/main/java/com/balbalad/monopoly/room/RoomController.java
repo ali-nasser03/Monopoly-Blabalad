@@ -34,6 +34,12 @@ public class RoomController {
         return RoomStateResponse.from(room, roomService.availablePieces(room));
     }
 
+    @PostMapping("/{code}/add-bot")
+    public RoomStateResponse addBot(@PathVariable String code, @RequestBody StartGameRequest req) {
+        var room = roomService.addBot(code, req.playerId());
+        return RoomStateResponse.from(room, roomService.availablePieces(room));
+    }
+
     @PostMapping("/{code}/start")
     public RoomStateResponse start(@PathVariable String code, @RequestBody StartGameRequest req) {
         var room = roomService.startGame(code, req.playerId());

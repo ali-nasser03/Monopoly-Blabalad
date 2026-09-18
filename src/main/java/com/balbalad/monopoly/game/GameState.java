@@ -42,6 +42,7 @@ public class GameState {
     private long lastJailSeq = 0;
     private String lastBackwardMovePlayerId;
     private long lastBackwardMoveSeq = 0;
+    private Instant nextBotActionAt;
 
     private PendingPurchase pendingPurchase;
     private AuctionState auction;
@@ -127,6 +128,8 @@ public class GameState {
         this.lastBackwardMovePlayerId = playerId;
         this.lastBackwardMoveSeq++;
     }
+    public Instant getNextBotActionAt() { return nextBotActionAt; }
+    public void setNextBotActionAt(Instant t) { this.nextBotActionAt = t; }
 
     public PendingPurchase getPendingPurchase() { return pendingPurchase; }
     public void setPendingPurchase(PendingPurchase p) { this.pendingPurchase = p; }

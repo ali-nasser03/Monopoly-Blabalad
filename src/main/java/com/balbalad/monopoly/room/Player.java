@@ -12,14 +12,20 @@ public class Player {
     private final String name;
     private final Piece piece;
     private final boolean host;
+    private final boolean bot;
     private volatile boolean connected;
     private volatile Instant lastSeen;
 
     public Player(String id, String name, Piece piece, boolean host) {
+        this(id, name, piece, host, false);
+    }
+
+    public Player(String id, String name, Piece piece, boolean host, boolean bot) {
         this.id = id;
         this.name = name;
         this.piece = piece;
         this.host = host;
+        this.bot = bot;
         this.connected = true;
         this.lastSeen = Instant.now();
     }
@@ -28,6 +34,7 @@ public class Player {
     public String getName() { return name; }
     public Piece getPiece() { return piece; }
     public boolean isHost() { return host; }
+    public boolean isBot() { return bot; }
     public boolean isConnected() { return connected; }
     public Instant getLastSeen() { return lastSeen; }
 

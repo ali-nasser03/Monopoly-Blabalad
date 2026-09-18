@@ -579,12 +579,12 @@ function renderRealPlayers(players, myId) {
         const li = document.createElement('li');
         li.className = 'player-item' + (p.connected ? '' : ' disconnected');
         li.dataset.playerId = p.id;
-        const suffix = p.id === myId ? ' (أنت)' : '';
+        const suffix = p.id === myId ? ' (أنت)' : (p.bot ? ' 🤖' : '');
         const jailed = gameState && gameState.inJail && gameState.inJail[p.id];
         li.innerHTML = '<span class="player-piece">' + (PIECE_ICONS[p.piece] || '●') + '</span>' +
             '<span class="player-name">' + (jailed ? '<span class="jail-icon">🔒</span>' : '') +
             escapeHtml(p.name) + suffix + '</span>' +
-            (!p.connected ? '<span class="disconnected-badge">غير متصل</span>' : '');
+            (!p.connected && !p.bot ? '<span class="disconnected-badge">غير متصل</span>' : '');
         list.appendChild(li);
     });
     highlightCurrentTurn();

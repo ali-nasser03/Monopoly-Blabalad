@@ -131,6 +131,28 @@ public class RoomService {
         }
     }
 
+    public Room addBot(String code, String requesterId) {
+        Room room = getRoomOrThrow(code);
+        synchronized (room) {
+            Player requester = findPlayer(room, requesterId);
+            if (!requester.isHost()) throw bad("بس صاحب الغرفة يقدر يضيف بوت");
+            if (room.isStarted()) throw bad("اللعبة بلشت مسبقًا، ما فيك تضيف بوت هلق");
+            if (room.getPlayers().size() >= room.getMaxPlayers()) throw bad("الغرفة كاملة");
+
+            Set<Piece> free = availablePieces(room);
+            if (free.isEmpty()) throw bad("ما في قطع فاضية تنعطى للبوت");
+            Piece piece = free.iterator().next();
+
+            long botCount = room.getPlayers().stream().filter(Player::isBot).count();
+            String botName = "بوت " + (botCount + 1);
+
+            Player bot = new Player(UUID.randomUUID().toString(), botName, piece, false, true);
+            room.getPlayers().add(bot);
+            broadcast(room);
+            return room;
+        }
+    }
+
     public Room getRoomOrThrow(String code) {
         Room room = rooms.get(code == null ? "" : code.trim());
         if (room == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ما في غرفة بهاد الكود");

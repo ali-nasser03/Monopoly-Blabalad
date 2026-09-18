@@ -37,13 +37,19 @@
             <button class="back-btn" data-goto="screen-landing" aria-label="رجوع">→</button>
             <h2>إنشاء لعبة</h2>
 
+            <label>نوع اللعبة</label>
+            <div class="count-picker" id="create-mode-picker">
+                <button type="button" class="count-btn mode-btn active" data-mode="friends">👥 ضد أصحاب</button>
+                <button type="button" class="count-btn mode-btn" data-mode="bots">🤖 ضد الكمبيوتر</button>
+            </div>
+
             <label for="create-name">اسم اللاعب</label>
             <input type="text" id="create-name" maxlength="20" placeholder="اكتب اسمك">
 
             <label>اختر قطعتك</label>
             <div id="create-piece-picker" class="piece-picker"></div>
 
-            <label>عدد اللاعبين</label>
+            <label id="create-count-label">عدد اللاعبين</label>
             <div class="count-picker" id="create-count-picker">
                 <button type="button" class="count-btn" data-count="2">2</button>
                 <button type="button" class="count-btn" data-count="3">3</button>
@@ -52,7 +58,7 @@
 
             <p class="form-error" id="create-error"></p>
             <button class="wood-btn" id="create-submit">إنشاء اللعبة</button>
-            <p class="hint-text">سيظهر لك كود من 4 أرقام لدعوة أصحابك</p>
+            <p class="hint-text" id="create-hint">سيظهر لك كود من 4 أرقام لدعوة أصحابك</p>
         </div>
     </section>
 
@@ -85,6 +91,7 @@
     <!-- 4) غرفة الانتظار -->
     <section id="screen-lobby" class="screen lobby-screen">
         <div class="parchment-card form-card">
+            <button class="back-btn" id="lobby-back-btn" aria-label="رجوع">→</button>
             <h2>غرفة اللعب</h2>
 
             <label>كود الغرفة</label>
@@ -95,6 +102,8 @@
 
             <label>اللاعبون</label>
             <ul id="lobby-players" class="lobby-players"></ul>
+
+            <button type="button" class="wood-btn secondary hidden" id="add-bot-btn">أضف بوت 🤖</button>
 
             <p class="form-error" id="lobby-error"></p>
             <button class="wood-btn" id="start-game-btn">بدء اللعبة</button>

@@ -83,6 +83,41 @@ function setupCountPicker() {
     });
 }
 
+// ---------- نوع اللعبة: ضد أصحاب أو ضد الكمبيوتر (شاشة الإنشاء) ----------
+function setupModePicker() {
+    const wrap = document.getElementById('create-mode-picker');
+    const countLabel = document.getElementById('create-count-label');
+    const countWrap = document.getElementById('create-count-picker');
+    const hint = document.getElementById('create-hint');
+
+    wrap.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            wrap.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const mode = btn.dataset.mode;
+            if (mode === 'bots') {
+                countLabel.textContent = 'كم بوت بدك تلعب ضده؟';
+                countWrap.querySelectorAll('.count-btn').forEach(b => {
+                    b.textContent = b.dataset.count === '2' ? '1' : (b.dataset.count === '3' ? '2' : '3');
+                });
+                hint.textContent = 'رح تلعب لحالك ضد البوتات مباشرة، بدون ما تحتاج تنتظر حدا';
+            } else {
+                countLabel.textContent = 'عدد اللاعبين';
+                countWrap.querySelectorAll('.count-btn').forEach(b => {
+                    b.textContent = b.dataset.count;
+                });
+                hint.textContent = 'سيظهر لك كود من 4 أرقام لدعوة أصحابك';
+            }
+        });
+    });
+}
+
+function getSelectedMode() {
+    const active = document.querySelector('#create-mode-picker .mode-btn.active');
+    return active ? active.dataset.mode : 'friends';
+}
+
 // ---------- أربع خانات كود الغرفة (شاشة الدخول) ----------
 function setupCodeBoxes() {
     const boxes = Array.from(document.querySelectorAll('#join-code-boxes .code-box'));
@@ -107,13 +142,27 @@ function setupCreateForm() {
         errorEl.textContent = '';
         const name = document.getElementById('create-name').value.trim();
         const piece = document.getElementById('create-piece-picker').dataset.selected;
-        const maxPlayers = Number(document.querySelector('#create-count-picker .count-btn.active').dataset.count);
+        const mode = getSelectedMode();
+        const countValue = Number(document.querySelector('#create-count-picker .count-btn.active').dataset.count);
 
         if (!name) { errorEl.textContent = 'لازم تكتب اسمك'; return; }
+
+        // countValue دايمًا = إجمالي عدد اللاعبين بالغرفة (2/3/4)، بغض النظر
+        // عن الوضع - بوضع "ضد الكمبيوتر" بس تغيّر النص المعروض ليبين عدد
+        // البوتات (= الإجمالي ناقص واحد، وهو إنت).
+        const maxPlayers = countValue;
 
         try {
             const data = await apiPost('/api/rooms', { name, piece, maxPlayers });
             enterLobby(data, name, piece);
+
+            if (mode === 'bots') {
+                const botCount = countValue - 1;
+                for (let i = 0; i < botCount; i++) {
+                    const room = await apiPost('/api/rooms/' + currentRoom.code + '/add-bot', { playerId: currentRoom.playerId });
+                    renderLobby(room);
+                }
+            }
         } catch (e) {
             errorEl.textContent = e.message;
         }
@@ -163,8 +212,9 @@ function renderLobby(room) {
         li.innerHTML =
             '<span class="player-piece">' + PIECE_ICONS[p.piece] + '</span>' +
             '<span class="player-name">' + escapePlain(p.name) + '</span>' +
+            (p.bot ? '<span class="host-badge">🤖 بوت</span>' : '') +
             (p.host ? '<span class="host-badge">المضيف</span>' : '') +
-            (!p.connected ? '<span class="disconnected-badge">غير متصل</span>' : '');
+            (!p.connected && !p.bot ? '<span class="disconnected-badge">غير متصل</span>' : '');
         list.appendChild(li);
     });
     for (let i = room.players.length; i < room.maxPlayers; i++) {
@@ -176,16 +226,20 @@ function renderLobby(room) {
 
     const me = room.players.find(p => p.id === currentRoom.playerId);
     const startBtn = document.getElementById('start-game-btn');
+    const addBotBtn = document.getElementById('add-bot-btn');
     const hint = document.getElementById('lobby-hint');
 
     if (me && me.host) {
         startBtn.style.display = '';
         startBtn.disabled = room.players.length < 2;
         hint.textContent = room.players.length < 2
-            ? 'بانتظار لاعب واحد ع الأقل زيادة حتى تقدر تبلش'
+            ? 'بانتظار لاعب واحد ع الأقل زيادة حتى تقدر تبلش (أو ضيف بوت)'
             : 'أنت فقط تستطيع بدء اللعبة';
+
+        addBotBtn.classList.toggle('hidden', room.players.length >= room.maxPlayers);
     } else {
         startBtn.style.display = 'none';
+        addBotBtn.classList.add('hidden');
         hint.textContent = 'بانتظار صاحب الغرفة يبدأ اللعبة...';
     }
 }
@@ -202,8 +256,23 @@ function setupLobbyActions() {
         }
     });
 
+    document.getElementById('add-bot-btn').addEventListener('click', async () => {
+        const errorEl = document.getElementById('lobby-error');
+        errorEl.textContent = '';
+        try {
+            const data = await apiPost('/api/rooms/' + currentRoom.code + '/add-bot', { playerId: currentRoom.playerId });
+            renderLobby(data);
+        } catch (e) {
+            errorEl.textContent = e.message;
+        }
+    });
+
     document.getElementById('copy-code-btn').addEventListener('click', () => {
         navigator.clipboard?.writeText(currentRoom.code);
+    });
+
+    document.getElementById('lobby-back-btn').addEventListener('click', () => {
+        window.returnToLandingAfterGame();
     });
 }
 
@@ -300,6 +369,7 @@ setupNavigation();
 renderPiecePicker('create-piece-picker', 'CAR');
 renderPiecePicker('join-piece-picker', 'SHIP');
 setupCountPicker();
+setupModePicker();
 setupCodeBoxes();
 setupCreateForm();
 setupJoinForm();

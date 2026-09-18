@@ -879,7 +879,7 @@ html, body {
 }
 .piece-option:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.count-picker { display: flex; gap: 0.5em; justify-content: center; }
+.count-picker { display: flex; gap: 0.5em; justify-content: center; flex-wrap: wrap; }
 .count-btn {
     width: clamp(32px, 5vw, 40px);
     height: clamp(32px, 5vw, 40px);
@@ -894,6 +894,14 @@ html, body {
     background: var(--maroon-bright);
     color: var(--parchment);
     border-color: var(--maroon-dark);
+}
+
+.mode-btn {
+    width: auto !important;
+    height: auto !important;
+    padding: 0.6em 1.1em;
+    font-size: clamp(12px, 2vw, 15px);
+    white-space: nowrap;
 }
 
 .code-input { display: flex; gap: 0.5em; justify-content: center; direction: ltr; }
