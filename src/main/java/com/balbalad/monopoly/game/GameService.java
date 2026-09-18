@@ -110,8 +110,11 @@ public class GameService {
                         // 3 محاولات فاشلة: يدفع 50 ويطلع تلقائيًا (دوره القادم عادي)
                         state.getInJail().put(playerId, false);
                         state.getJailAttempts().put(playerId, 0);
-                        state.getBalances().merge(playerId, -50, Integer::sum);
-                        logEvent(state, playerName(room, playerId) + " دفع ₪50 وطلع من المسكوبية بعد 3 محاولات");
+                        boolean paid = chargeOrGoIntoDebt(state, playerId, 50, null, true);
+                        if (paid) {
+                            logEvent(state, playerName(room, playerId) + " دفع ₪50 وطلع من المسكوبية بعد 3 محاولات");
+                        }
+                        // لو ما قدر يدفع، chargeOrGoIntoDebt فتح دين معلق - رح نوقف تمرير الدور تحت
                     }
                 }
                 state.setConsecutiveDoubles(0);
@@ -137,9 +140,11 @@ public class GameService {
             if (!wasInJail || isDouble) {
                 // لو ضل بالسجن (حاول ولا طلع)، ما في خانة جديدة نحسم نتيجتها
                 resolveLandingConsequences(state, room, playerId, advanceAfter, d1 + d2);
-            } else {
+            } else if (state.getPendingDebt() == null) {
                 finishDecision(state, room, advanceAfter);
             }
+            // لو صار دين معلق (بعد 3 محاولات فاشلة وما كفى الرصيد)، ما نمرر
+            // الدور - بيضل معلق لحد ما ينحل الدين زي أي دين تاني بالعبة.
 
             broadcast(code, state);
             return state;
@@ -153,11 +158,12 @@ public class GameService {
         if (next < old) {
             state.getBalances().merge(playerId, PASS_GO_BONUS, Integer::sum);
         }
-        if (next == GO_TO_JAIL_POSITION) {
-            sendToJail(state, room, playerId);
-        } else {
-            state.getPositions().put(playerId, next);
-        }
+        // ملاحظة: ما منحوّل هون فورًا لو next كانت خانة "استدعاء للمسكوبية" -
+        // نخلي القطعة توصل الخانة نفسها عاديًا زي أي خانة تانية، ومعالج
+        // الوقوف عليها (resolveLandingConsequences) هو يلي رح يتكفل
+        // بالتحويل الفعلي للسجن بعد وقفة قصيرة، حتى القطعة توصل بصريًا
+        // قبل ما ترسل.
+        state.getPositions().put(playerId, next);
     }
 
     private void sendToJail(GameState state, Room room, String playerId) {
@@ -224,6 +230,14 @@ public class GameService {
             case CHANCE -> resolveCardDraw(state, room, playerId, CardDeckType.CHANCE, advanceAfter, diceSum);
             case COMMUNITY_CHEST -> resolveCardDraw(state, room, playerId, CardDeckType.COMMUNITY_CHEST, advanceAfter, diceSum);
             case JERUSALEM_GATE -> resolveCardDraw(state, room, playerId, CardDeckType.GATE, advanceAfter, diceSum);
+            case GO_TO_JAIL -> {
+                // القطعة وصلت فعليًا لخانة "استدعاء للمسكوبية" (مش بطاقة) -
+                // منستخدم نفس آلية تأجيل حركة البطاقات (بطاقة اصطناعية
+                // بدون نص يظهر) حتى تصير نفس الوقفة القصيرة قبل التحويل الفعلي.
+                Card syntheticJailCard = new Card("", CardEffectType.GO_TO_JAIL, 0, -1, 0, 0, 0);
+                state.setPendingCardMove(new PendingCardMove(playerId, syntheticJailCard, diceSum, advanceAfter,
+                        Instant.now().plusSeconds(CARD_MOVE_DELAY_SECONDS)));
+            }
             default -> finishDecision(state, room, advanceAfter);
         }
     }
@@ -311,7 +325,7 @@ public class GameService {
                 state.getSkipNextTurn().put(playerId, true);
                 finishDecision(state, room, advanceAfter);
             }
-            case GO_TO_JAIL, MOVE_TO, MOVE_RELATIVE -> {
+            case GO_TO_JAIL, MOVE_TO, MOVE_TO_BACKWARD, MOVE_RELATIVE -> {
                 // منوقف هون: نخلي اللاعب يبين لسا واقف عالبطاقة (مع نصها)
                 // بهاد البث، وبعد فترة قصيرة الفحص الدوري بينفذ الحركة
                 // الفعلية وبيبث تاني - حتى القطعة توصل فعلًا للبطاقة أول
@@ -336,6 +350,9 @@ public class GameService {
         } else if (card.type() == CardEffectType.MOVE_TO) {
             moveToPosition(state, room, playerId, card.targetPosition());
             resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
+        } else if (card.type() == CardEffectType.MOVE_TO_BACKWARD) {
+            moveToPositionBackward(state, room, playerId, card.targetPosition());
+            resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
         } else {
             moveRelative(state, room, playerId, card.steps());
             resolveLandingConsequences(state, room, playerId, pcm.isAdvanceAfter(), pcm.getDiceSum());
@@ -348,6 +365,17 @@ public class GameService {
         if (target < old) {
             state.getBalances().merge(playerId, PASS_GO_BONUS, Integer::sum);
         }
+        if (target == GO_TO_JAIL_POSITION) {
+            sendToJail(state, room, playerId);
+        } else {
+            state.getPositions().put(playerId, target);
+        }
+    }
+
+    /** للبطاقات يلي صراحة "بترجعك" لخانة محددة (زي "ارجع لأبو ديس") - رجوع فعلي بدون قبض 200 أو لف اللوح للأمام. */
+    private void moveToPositionBackward(GameState state, Room room, String playerId, int target) {
+        if (state.isEnded()) return;
+        state.markBackwardMove(playerId);
         if (target == GO_TO_JAIL_POSITION) {
             sendToJail(state, room, playerId);
         } else {
@@ -1130,6 +1158,8 @@ public class GameService {
                         resolveAuctionEnd(state, room);
                         broadcast(code, state);
                     } else if (state.getPendingPurchase() == null && state.getAuction() == null
+                            && state.getPendingDebt() == null && state.getPendingCardMove() == null
+                            && state.getNegotiation() == null
                             && state.getTurnDeadline() != null && now.isAfter(state.getTurnDeadline())) {
                         String playerId = state.currentPlayerId();
                         state.getMissedTurns().merge(playerId, 1, Integer::sum);

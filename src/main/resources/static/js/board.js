@@ -300,6 +300,7 @@ function renderTokens() {
     if (gameState) {
         myPlayers.forEach(p => {
             if (animatingPlayers.has(p.id)) return; // الأنيميشن بتدير قطعته لحالها
+            if (gameState.turnOrder && !gameState.turnOrder.includes(p.id)) return; // أفلس وطلع من اللعبة
             const pos = gameState.positions ? gameState.positions[p.id] : undefined;
             if (pos == null) return;
             const tile = tilesByPosition[pos];
@@ -357,6 +358,14 @@ const JAIL_TELEPORT_PAUSE_MS = 1200; // وقفة قبل ما تظهر النتي
 function animateTokenMovement(playerId, fromPos, toPos, teleport, backward) {
     if (teleport || fromPos == null || fromPos === toPos) {
         placeTokenAt(playerId, toPos);
+        if (teleport) {
+            // منضل "مشغولين" طول الوقفة كمان، حتى ما يقدر حدا يلعب أثناءها
+            animatingPlayers.add(playerId);
+            setTimeout(() => {
+                animatingPlayers.delete(playerId);
+                if (animatingPlayers.size === 0) renderTurnUI();
+            }, JAIL_TELEPORT_PAUSE_MS);
+        }
         return teleport ? JAIL_TELEPORT_PAUSE_MS : 0;
     }
     const path = [];
@@ -373,6 +382,7 @@ function animateTokenMovement(playerId, fromPos, toPos, teleport, backward) {
         if (stepIndex >= path.length) {
             animatingPlayers.delete(playerId);
             placeTokenAt(playerId, toPos);
+            if (animatingPlayers.size === 0) renderTurnUI(); // نعيد تفعيل الأزرار بعد ما خلصت كل الحركات
             return;
         }
         placeTokenAt(playerId, path[stepIndex]);
@@ -608,7 +618,7 @@ function renderTurnUI(actionDelayMs) {
 
     renderEventLog();
 
-    const busy = !!gameState.pendingPurchase || !!gameState.auction || !!gameState.pendingDebt || !!gameState.pendingCardMove;
+    const busy = !!gameState.pendingPurchase || !!gameState.auction || !!gameState.pendingDebt || !!gameState.pendingCardMove || animatingPlayers.size > 0;
     const iAmJailed = !!(gameState.inJail && gameState.inJail[myPlayerId]);
     const isMyTurn = gameState.currentTurnPlayerId === myPlayerId && !gameState.ended && !busy && !iAmJailed;
     const rollBtn = document.getElementById('roll-btn');
@@ -1067,7 +1077,7 @@ function describeBundle(cash, properties) {
 function renderNegotiationStatus() {
     const modal = document.getElementById('negotiate-incoming-modal');
     const n = gameState.negotiation;
-    if (!n || (n.initiatorId !== myPlayerId && n.counterpartId !== myPlayerId)) {
+    if (!n) {
         modal.classList.add('hidden');
         clearInterval(negotiationCountdownInterval);
         return;
@@ -1079,6 +1089,7 @@ function renderNegotiationStatus() {
     const initiatorName = initiator ? initiator.name : 'لاعب';
     const counterpartName = counterpart ? counterpart.name : 'لاعب';
     const isInitiator = n.initiatorId === myPlayerId;
+    const isCounterpart = n.counterpartId === myPlayerId;
 
     document.getElementById('neg-incoming-title').textContent =
         initiatorName + ' ⇄ ' + counterpartName + (isInitiator ? ' (بانتظار الرد)' : '');
@@ -1090,11 +1101,12 @@ function renderNegotiationStatus() {
     document.getElementById('neg-incoming-give').textContent =
         initiatorName + ' بيطلب من ' + counterpartName + ': ' + describeBundle(n.requestCash, n.requestProperties);
 
-    document.getElementById('neg-respond-actions').classList.toggle('hidden', isInitiator);
+    // الأزرار تظهر بس لطرفي العرض - أي لاعب تاني يشوف العرض بدون أي تحكم فيه
+    document.getElementById('neg-respond-actions').classList.toggle('hidden', !isCounterpart);
     document.getElementById('neg-cancel-btn').classList.toggle('hidden', !isInitiator);
 
     const acceptBtn = document.getElementById('neg-accept-btn');
-    if (!isInitiator) {
+    if (isCounterpart) {
         const canAfford = myBalance >= n.requestCash;
         acceptBtn.disabled = !canAfford;
         acceptBtn.title = canAfford ? '' : 'رصيدك ما يكفي تقبل هاد العرض (لازم ₪' + n.requestCash + ')';

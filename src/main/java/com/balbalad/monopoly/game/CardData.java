@@ -34,7 +34,7 @@ public final class CardData {
 
     public static final List<Card> COMMUNITY_CHEST = List.of(
             new Card("بطاقة شحرور من المسكوبية - احتفظ فيها لحد ما تحتاجها", JAIL_FREE_CARD, 0, -1, 0, 0, 0),
-            new Card("ارجع لأبو ديس", MOVE_TO, 0, 1, 0, 0, 0),
+            new Card("ارجع لأبو ديس", MOVE_TO_BACKWARD, 0, 1, 0, 0, 0),
             new Card("ادفع ₪100 تأمين صحي", PAY, 100, -1, 0, 0, 0),
             new Card("بطلعلك ورثة ₪100", COLLECT, 100, -1, 0, 0, 0),
             new Card("لأنك بتلعب مونوبولي بالبلد: خد ₪10", COLLECT, 10, -1, 0, 0, 0),
