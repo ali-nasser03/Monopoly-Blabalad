@@ -891,24 +891,39 @@ public class GameService {
         PendingDebt debt = state.getPendingDebt();
         String playerId = debt.getPlayerId();
 
-        autoRaiseFundsByDemolishing(state, playerId, debt.getAmountOwed());
-        autoRaiseFundsByMortgaging(state, playerId, debt.getAmountOwed());
+        try {
+            autoRaiseFundsByDemolishing(state, playerId, debt.getAmountOwed());
+            autoRaiseFundsByMortgaging(state, playerId, debt.getAmountOwed());
 
-        Integer balance = state.getBalances().get(playerId);
-        state.setPendingDebt(null); // نمسحه هون قبل أي مسار، حتى لو صار خطأ غير متوقع ما يضل عالق
+            Integer balance = state.getBalances().get(playerId);
+            state.setPendingDebt(null); // نمسحه هون قبل أي مسار، حتى لو صار خطأ غير متوقع ما يضل عالق
 
-        if (balance != null && balance >= debt.getAmountOwed()) {
-            state.getBalances().merge(playerId, -debt.getAmountOwed(), Integer::sum);
-            if (debt.getCreditorId() != null) {
-                state.getBalances().merge(debt.getCreditorId(), debt.getAmountOwed(), Integer::sum);
+            if (balance != null && balance >= debt.getAmountOwed()) {
+                state.getBalances().merge(playerId, -debt.getAmountOwed(), Integer::sum);
+                if (debt.getCreditorId() != null) {
+                    state.getBalances().merge(debt.getCreditorId(), debt.getAmountOwed(), Integer::sum);
+                }
+                logEvent(state, playerName(room, playerId) + " سدد دين ₪" + debt.getAmountOwed() + " تلقائيًا (هدم/رهن بدون قرار بالوقت)");
+                boolean advanceAfter = debt.isAdvanceTurnAfter();
+                finishDecision(state, room, advanceAfter);
+            } else {
+                executeBankruptcy(state, playerId, debt.getCreditorId());
+                logEvent(state, playerName(room, playerId) + " أعلن إفلاسه تلقائيًا (ما قرر بالوقت) وطلع من اللعبة 💔");
+                removePlayerFromTurnOrder(state, room, playerId);
             }
-            logEvent(state, playerName(room, playerId) + " سدد دين ₪" + debt.getAmountOwed() + " تلقائيًا (هدم/رهن بدون قرار بالوقت)");
-            boolean advanceAfter = debt.isAdvanceTurnAfter();
-            finishDecision(state, room, advanceAfter);
-        } else {
-            executeBankruptcy(state, playerId, debt.getCreditorId());
-            logEvent(state, playerName(room, playerId) + " أعلن إفلاسه تلقائيًا (ما قرر بالوقت) وطلع من اللعبة 💔");
-            removePlayerFromTurnOrder(state, room, playerId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            // شبكة أمان أخيرة: أي خطأ غير متوقع هون ما لازم يخلي اللاعب
+            // (إنسان أو بوت) عالق بحالة غير متسقة بلا أي بث يوصل حدا -
+            // منجبر الإفلاس مباشرة حتى نضمن حالة نهائية واضحة ومتسقة.
+            try {
+                state.setPendingDebt(null);
+                executeBankruptcy(state, playerId, debt.getCreditorId());
+                logEvent(state, playerName(room, playerId) + " أعلن إفلاسه (خطأ غير متوقع بالحل التلقائي) 💔");
+                removePlayerFromTurnOrder(state, room, playerId);
+            } catch (Exception fallbackError) {
+                fallbackError.printStackTrace();
+            }
         }
     }
 
@@ -1245,9 +1260,15 @@ public class GameService {
         String botId = findActingBotId(state, room);
         if (botId == null) return;
 
-        performBotAction(state, room, code, botId);
-        long delay = BOT_MIN_DELAY_MS + random.nextInt((int) (BOT_MAX_DELAY_MS - BOT_MIN_DELAY_MS));
-        state.setNextBotActionAt(Instant.now().plusMillis(delay));
+        try {
+            performBotAction(state, room, code, botId);
+        } catch (Exception e) {
+            // ما لازم أي خطأ غير متوقع هون يعلّق اللعبة أو يمنع باقي الفحص الدوري
+            e.printStackTrace();
+        } finally {
+            long delay = BOT_MIN_DELAY_MS + random.nextInt((int) (BOT_MAX_DELAY_MS - BOT_MIN_DELAY_MS));
+            state.setNextBotActionAt(Instant.now().plusMillis(delay));
+        }
     }
 
     /** يحدد مين البوت (إذا في) يلي لازم ياخد قرار هلق، بترتيب أولوية يطابق شو بيشوفه لاعب حقيقي. */
@@ -1335,21 +1356,37 @@ public class GameService {
     /** يهدم ويرهن قد ما يلزم (نفس منطق الحل التلقائي)، وبعدين يسدد أو يعلن إفلاسه. */
     private void botResolveDebt(String code, String botId) {
         GameState state = getStateOrThrow(code);
+        Room room = roomService.getRoomOrThrow(code);
         synchronized (state) {
             PendingDebt debt = state.getPendingDebt();
             if (debt == null || !botId.equals(debt.getPlayerId())) return;
 
-            autoRaiseFundsByDemolishing(state, botId, debt.getAmountOwed());
-            autoRaiseFundsByMortgaging(state, botId, debt.getAmountOwed());
-
-            Integer balance = state.getBalances().get(botId);
             try {
+                autoRaiseFundsByDemolishing(state, botId, debt.getAmountOwed());
+                autoRaiseFundsByMortgaging(state, botId, debt.getAmountOwed());
+
+                Integer balance = state.getBalances().get(botId);
                 if (balance != null && balance >= debt.getAmountOwed()) {
                     payDebt(code, botId);
                 } else {
                     declareBankruptcy(code, botId);
                 }
-            } catch (RuntimeException ignored) {}
+            } catch (Exception e) {
+                e.printStackTrace();
+                // شبكة أمان أخيرة: أي خطأ غير متوقع بالمسار العادي ما لازم
+                // يخلي الدين عالق للأبد - منجبر الإفلاس مباشرة بدل ما نتعلق.
+                try {
+                    if (state.getPendingDebt() != null && botId.equals(state.getPendingDebt().getPlayerId())) {
+                        state.setPendingDebt(null);
+                        executeBankruptcy(state, botId, debt.getCreditorId());
+                        logEvent(state, playerName(room, botId) + " أعلن إفلاسه (خطأ غير متوقع بالحل التلقائي) 💔");
+                        removePlayerFromTurnOrder(state, room, botId);
+                        broadcast(code, state);
+                    }
+                } catch (Exception fallbackError) {
+                    fallbackError.printStackTrace();
+                }
+            }
         }
     }
 
