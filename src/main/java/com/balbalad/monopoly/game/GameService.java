@@ -1259,17 +1259,67 @@ public class GameService {
         if (state.getNextBotActionAt() != null && now.isBefore(state.getNextBotActionAt())) return;
 
         String botId = findActingBotId(state, room);
-        if (botId == null) return;
-
-        try {
-            performBotAction(state, room, code, botId);
-        } catch (Exception e) {
-            // ما لازم أي خطأ غير متوقع هون يعلّق اللعبة أو يمنع باقي الفحص الدوري
-            e.printStackTrace();
-        } finally {
-            long delay = BOT_MIN_DELAY_MS + random.nextInt((int) (BOT_MAX_DELAY_MS - BOT_MIN_DELAY_MS));
-            state.setNextBotActionAt(Instant.now().plusMillis(delay));
+        if (botId != null) {
+            try {
+                performBotAction(state, room, code, botId);
+            } catch (Exception e) {
+                // ما لازم أي خطأ غير متوقع هون يعلّق اللعبة أو يمنع باقي الفحص الدوري
+                e.printStackTrace();
+            } finally {
+                scheduleNextBotAction(state);
+            }
+            return;
         }
+
+        // ما في شي عاجل (دور/دين/شراء/تفاوض) - نفحص إذا في بوت فرصة يبني
+        // فيها (نشاط "بين الأدوار"، متاح لأي وقت زي أي لاعب حقيقي تمامًا).
+        try {
+            if (botConsiderBuilding(state, room, code)) {
+                scheduleNextBotAction(state);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void scheduleNextBotAction(GameState state) {
+        long delay = BOT_MIN_DELAY_MS + random.nextInt((int) (BOT_MAX_DELAY_MS - BOT_MIN_DELAY_MS));
+        state.setNextBotActionAt(Instant.now().plusMillis(delay));
+    }
+
+    /** يفحص كل البوتات، وأول فرصة بناء منطقية (مجموعة كاملة + احتياطي كافي) ينفذها. بناء واحد بكل مرة. */
+    private boolean botConsiderBuilding(GameState state, Room room, String code) {
+        final int RESERVE = 250; // احتياطي أمان - ما يصرف تحته حتى لو قادر يبني
+
+        for (Player p : room.getPlayers()) {
+            if (!p.isBot()) continue;
+            String botId = p.getId();
+            if (!state.getTurnOrder().contains(botId)) continue; // أفلس وطلع
+
+            Integer balance = state.getBalances().get(botId);
+            if (balance == null) continue;
+
+            for (BoardSquare sq : BoardData.SQUARES) {
+                if (sq.type() != SquareType.PROPERTY) continue;
+                if (!botId.equals(state.getOwnership().get(sq.position()))) continue;
+                if (Boolean.TRUE.equals(state.getMortgaged().get(sq.position()))) continue;
+                if (!ownsEntireGroup(state, sq.position())) continue;
+                if (groupHasMortgaged(state, sq.colorGroup())) continue;
+
+                int current = state.getHouses().getOrDefault(sq.position(), 0);
+                if (current >= 5) continue;
+                if (!canBuildEvenly(state, sq.colorGroup(), sq.position(), current)) continue;
+
+                int cost = sq.colorGroup().getHouseCost();
+                if (balance - cost < RESERVE) continue;
+
+                try {
+                    buildHouse(code, botId, sq.position());
+                    return true; // بناء واحد بس بكل مرة، حتى تضل وقفة طبيعية بين كل بناء
+                } catch (RuntimeException ignored) {}
+            }
+        }
+        return false;
     }
 
     /** يحدد مين البوت (إذا في) يلي لازم ياخد قرار هلق، بترتيب أولوية يطابق شو بيشوفه لاعب حقيقي. */
@@ -1403,10 +1453,24 @@ public class GameService {
 
         Integer balance = state.getBalances().get(botId);
         boolean canAfford = balance != null && balance >= n.getRequestCash();
-        boolean fairDeal = getValue >= giveValue;
+
+        // هل الصفقة رح تكمّل مجموعة لونية كاملة للطرف التاني؟ خطر استراتيجي
+        // كبير (احتكار كامل بيعني إيجار مضاعف) حتى لو السعر شكله "عادل".
+        boolean completesMonopolyForThem = n.getRequestProperties().stream().anyMatch(pos -> {
+            BoardSquare sq = BoardData.SQUARES.get(pos);
+            if (sq.colorGroup() == ColorGroup.NONE) return false;
+            return BoardData.SQUARES.stream()
+                    .filter(s -> s.colorGroup() == sq.colorGroup())
+                    .allMatch(s -> s.position() == pos || n.getInitiatorId().equals(state.getOwnership().get(s.position())));
+        });
+
+        // ما يرضى بمجرد "تعادل" - لازم فايدة واضحة، وأكتر تشدد لو رح يكمّل
+        // احتكار الطرف التاني.
+        double requiredMargin = completesMonopolyForThem ? 1.6 : 1.15;
+        boolean goodDeal = getValue >= giveValue * requiredMargin;
 
         try {
-            respondTrade(code, botId, canAfford && fairDeal);
+            respondTrade(code, botId, canAfford && goodDeal);
         } catch (RuntimeException ignored) {}
     }
 
