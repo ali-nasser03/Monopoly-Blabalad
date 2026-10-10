@@ -135,9 +135,16 @@ function recoverBoardJs() {
     boardRecovery = (async () => {
         let reason = null;
         try {
-            const res = await fetch('/js/board.js?r=' + Date.now(), { cache: 'no-store' });
-            if (!res.ok) {
-                reason = 'ملف board.js مش موجود على السيرفر (HTTP ' + res.status + '). تأكد إنه موجود بـ static/js/board.js وإنه انرفع مع آخر commit وخلص الـ deploy.';
+            // سيرفر لينكس حساس لحالة الأحرف: board.js غير Board.js، فمنجرب الاسمين
+            let res = null;
+            let firstStatus = 0;
+            for (const name of ['/js/board.js', '/js/Board.js']) {
+                const r = await fetch(name + '?r=' + Date.now(), { cache: 'no-store' });
+                if (r.ok) { res = r; break; }
+                if (!firstStatus) firstStatus = r.status;
+            }
+            if (!res) {
+                reason = 'ملف board.js مش موجود على السيرفر (HTTP ' + firstStatus + '، جرّبت board.js و Board.js). تأكد إنه موجود بـ static/js/ وإنه انرفع مع آخر commit وخلص الـ deploy.';
             } else {
                 const text = await res.text();
                 let run = null;

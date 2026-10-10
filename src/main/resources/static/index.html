@@ -444,6 +444,10 @@
 <script src="js/vendor/sockjs.min.js"></script>
 <script src="js/vendor/stomp.min.js"></script>
 <script src="js/board.js"></script>
+<script>
+    // سيرفر لينكس حساس لحالة الأحرف: لو الملف انحفظ باسم Board.js (حرف كبير) منحمّله بهالاسم
+    if (!window.startBoardGame) document.write('<script src="js/Board.js"><\/script>');
+</script>
 <script src="js/room.js"></script>
 </body>
 </html>
