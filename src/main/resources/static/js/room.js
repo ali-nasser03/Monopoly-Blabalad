@@ -2,6 +2,44 @@
 const PIECE_ORDER = ['SHIP', 'CAR', 'HAT', 'KEY', 'COFFEE', 'BALL', 'BOOK'];
 const SESSION_KEY = 'balbalad-session';
 
+// أيقونات القطع: النسخة الأصلية بـ board.js (PIECE_ICONS). هاي نسخة احتياطية حتى
+// تضل شاشات الإنشاء والدخول شغالة حتى لو board.js ما انحمّل أو فيه خطأ.
+const PIECE_ICONS_FALLBACK = {
+    SHIP: '⛵', CAR: '🚗', HAT: '🎩', KEY: '🔑',
+    COFFEE: '☕', BALL: '⚽', BOOK: '📖'
+};
+function pieceIcon(piece) {
+    try {
+        if (typeof PIECE_ICONS !== 'undefined' && PIECE_ICONS[piece]) return PIECE_ICONS[piece];
+    } catch (e) { /* board.js ما اشتغل: منستعمل الاحتياطي */ }
+    return PIECE_ICONS_FALLBACK[piece] || '●';
+}
+
+// شريط أحمر صغير بأعلى الصفحة لما يصير خطأ بالتحميل، بدل ما تموت الأزرار بصمت.
+function reportProblem(message) {
+    try {
+        let bar = document.getElementById('problem-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'problem-bar';
+            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7a1f2b;color:#fff;' +
+                'font:600 13px/1.5 Cairo,sans-serif;padding:6px 36px 6px 12px;text-align:center;direction:rtl;' +
+                'box-shadow:0 2px 8px rgba(0,0,0,.5)';
+            const close = document.createElement('button');
+            close.textContent = '✕';
+            close.setAttribute('aria-label', 'إغلاق');
+            close.style.cssText = 'position:absolute;right:8px;top:2px;background:none;border:none;color:#fff;font-size:18px;cursor:pointer;min-width:32px;min-height:28px';
+            close.addEventListener('click', () => bar.remove());
+            const text = document.createElement('span');
+            text.id = 'problem-bar-text';
+            bar.appendChild(text);
+            bar.appendChild(close);
+            document.body.appendChild(bar);
+        }
+        document.getElementById('problem-bar-text').textContent = message;
+    } catch (e) { /* لا شي */ }
+}
+
 let currentRoom = null; // { code, playerId }
 let stompClient = null;
 
@@ -90,7 +128,7 @@ function renderPiecePicker(containerId, defaultPiece) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'piece-option' + (piece === defaultPiece ? ' selected' : '');
-        btn.textContent = PIECE_ICONS[piece];
+        btn.textContent = pieceIcon(piece);
         btn.dataset.piece = piece;
         btn.addEventListener('click', () => {
             el.querySelectorAll('.piece-option').forEach(b => b.classList.remove('selected'));
@@ -247,7 +285,7 @@ function renderLobby(room) {
         const li = document.createElement('li');
         li.className = 'player-item' + (p.connected ? '' : ' disconnected');
         li.innerHTML =
-            '<span class="player-piece">' + PIECE_ICONS[p.piece] + '</span>' +
+            '<span class="player-piece">' + pieceIcon(p.piece) + '</span>' +
             '<span class="player-name">' + escapePlain(p.name) + '</span>' +
             (p.bot ? '<span class="host-badge">🤖 بوت</span>' : '') +
             (p.host ? '<span class="host-badge">المضيف</span>' : '') +
@@ -362,10 +400,14 @@ function connectWebSocket(code) {
 
 // ---------- الانتقال لشاشة اللعب ----------
 function enterGame(room) {
-    showScreen('screen-game');
-    if (window.startBoardGame) {
-        window.startBoardGame(room.players, currentRoom.playerId, currentRoom.code);
+    if (!window.startBoardGame) {
+        // board.js ما انحمّل: بدل لوح فاضي، منظهر السبب وبنضل باللوبي
+        showScreen('screen-lobby');
+        reportProblem('ملف اللوح (board.js) ما انحمّل عندك، فما بنقدر نفتح اللعبة. اعمل تحديث قوي Ctrl+F5 (أو امسح الكاش) وجرب مرة ثانية.');
+        return;
     }
+    showScreen('screen-game');
+    window.startBoardGame(room.players, currentRoom.playerId, currentRoom.code);
 }
 
 // board.js بينادي هاي لما تنتهي اللعبة فعليًا (تصويت إجماع) والمستخدم
@@ -405,13 +447,31 @@ async function tryAutoReconnect() {
     }
 }
 
-setupNavigation();
-renderPiecePicker('create-piece-picker', 'CAR');
-renderPiecePicker('join-piece-picker', 'SHIP');
-setupCountPicker();
-setupModePicker();
-setupCodeBoxes();
-setupCreateForm();
-setupJoinForm();
-setupLobbyActions();
-tryAutoReconnect();
+// كل خطوة تهيئة بتتنفذ لحالها: لو وحدة فشلت (لأي سبب) باقي الأزرار بتضل شغالة،
+// والخطأ بيبين بالشريط الأحمر وبـ Console (F12) بدل ما تموت الأزرار بصمت.
+function safeInit(name, fn) {
+    try {
+        fn();
+    } catch (e) {
+        console.error('[init] فشلت خطوة "' + name + '":', e);
+        reportProblem('صار خطأ بتحميل الصفحة (' + name + '): ' + (e && e.message ? e.message : e));
+    }
+}
+
+safeInit('التنقل', setupNavigation);
+safeInit('قطع الإنشاء', () => renderPiecePicker('create-piece-picker', 'CAR'));
+safeInit('قطع الدخول', () => renderPiecePicker('join-piece-picker', 'SHIP'));
+safeInit('عدد اللاعبين', setupCountPicker);
+safeInit('نوع اللعبة', setupModePicker);
+safeInit('خانات الكود', setupCodeBoxes);
+safeInit('نموذج الإنشاء', setupCreateForm);
+safeInit('نموذج الدخول', setupJoinForm);
+safeInit('غرفة الانتظار', setupLobbyActions);
+
+// board.js لازم يكون عرّف startBoardGame قبل هون؛ لو لا، في خطأ بتحميله
+if (!window.startBoardGame) {
+    console.error('[init] board.js ما انحمّل أو وقف بنص الطريق (window.startBoardGame مش معرّفة)');
+    reportProblem('ملف اللعبة (board.js) ما انحمّل صح. اعمل Ctrl+F5؛ وإذا ضلت المشكلة افتح F12 ← Console وصوّر الخطأ الأحمر.');
+}
+
+tryAutoReconnect().catch(e => console.error('[init] رجوع تلقائي فشل:', e));
