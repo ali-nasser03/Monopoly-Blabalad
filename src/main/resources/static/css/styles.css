@@ -1097,7 +1097,7 @@ html, body {
    الوضع العمودي: النماذج وغرفة الانتظار والقوانين بأحجام مريحة للموبايل
    (القيم الأصلية مضبوطة للوضع الأفقي، وبتطلع صغيرة جدًا عمودي)
    ===================================================================== */
-@media (orientation: portrait) {
+@media (orientation: portrait), (min-height: 761px) {
     .form-card { width: min(92vw, 420px); padding: 1.4em 1.2em 1.2em; }
     .form-card h2 { font-size: 26px; }
     .form-card label { font-size: 15px; margin: 0.9em 0 0.35em; }
@@ -1210,4 +1210,189 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
     .auction-leader.flash { animation: none; }
+}
+
+/* =====================================================================
+   أزرار النماذج (الإنشاء والدخول): أهداف لمس مريحة + بدون zoom على الآيفون
+   ===================================================================== */
+
+/* زر الرجوع: السهم نفسه صغير، فنكبّر مساحة اللمس لـ 44px بدون ما يتحرك مكانه */
+.form-card .back-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    top: 2px;
+    right: 4px;
+    line-height: 1;
+}
+
+/* بدون تأخير اللمس مرتين / zoom عند الضغط السريع */
+.form-card button,
+.form-card .piece-option,
+.form-card .count-btn { touch-action: manipulation; }
+
+/* الأفقي: الآيفون بيعمل zoom تلقائي لأي حقل خطه أقل من 16px وبيبقى الزوم */
+@media (orientation: landscape) {
+    .form-card input[type="text"] { font-size: 16px; }
+}
+
+/* ---------- الأفقي على الموبايل: عمودين بدل عمود طويل (بدون تمرير داخل البطاقة) ---------- */
+@media (orientation: landscape) and (max-height: 760px) {
+    #screen-create .form-card,
+    #screen-join .form-card {
+        --form-w: min(94vw, 720px);
+        --form-col: calc((var(--form-w) - 48px - 20px) / 2);   /* عرض العمود الواحد */
+        width: var(--form-w);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 20px;
+        row-gap: 0;
+        align-content: start;
+        padding: 8px 24px 12px;
+    }
+    #screen-create .form-card > h2,
+    #screen-join .form-card > h2 { grid-column: 1 / -1; grid-row: 1; margin: 4px 0 2px; font-size: 20px; }
+    .form-card label { font-size: 13px; margin: 6px 0 4px; }
+
+    /* --- الإنشاء: العمود الأول (يمين) = النوع + الاسم، الثاني (يسار) = القطعة + العدد --- */
+    /* ملاحظة: nth-of-type بيعد وسوم label بالترتيب: 1 نوع، 2 اسم، 3 قطعة، 4 عدد */
+    #screen-create .form-card > label:nth-of-type(1) { grid-column: 1; grid-row: 2; }
+    #screen-create #create-mode-picker               { grid-column: 1; grid-row: 3; align-self: start; }
+    #screen-create .form-card > label:nth-of-type(2) { grid-column: 1; grid-row: 4; }
+    #screen-create #create-name                      { grid-column: 1; grid-row: 5; align-self: start; }
+    #screen-create .form-card > label:nth-of-type(3) { grid-column: 2; grid-row: 2; }
+    #screen-create #create-piece-picker              { grid-column: 2; grid-row: 3; align-self: start; }
+    #screen-create #create-count-label               { grid-column: 2; grid-row: 4; }
+    #screen-create #create-count-picker              { grid-column: 2; grid-row: 5; align-self: start; }
+    #screen-create #create-error,
+    #screen-create #create-submit,
+    #screen-create #create-hint                      { grid-column: 1 / -1; }
+    #screen-create #create-error  { grid-row: 6; }
+    #screen-create #create-submit { grid-row: 7; }
+    #screen-create #create-hint   { grid-row: 8; }
+
+    /* --- الدخول: يمين = الاسم + الكود، يسار = القطعة --- */
+    #screen-join .form-card > label:nth-of-type(1) { grid-column: 1; grid-row: 2; }
+    #screen-join #join-name                        { grid-column: 1; grid-row: 3; align-self: start; }
+    #screen-join .form-card > label:nth-of-type(3) { grid-column: 1; grid-row: 4; }
+    #screen-join #join-code-boxes                  { grid-column: 1; grid-row: 5; align-self: start; }
+    #screen-join .form-card > label:nth-of-type(2) { grid-column: 2; grid-row: 2; }
+    #screen-join #join-piece-picker                { grid-column: 2; grid-row: 3 / 6; align-self: start; }
+    #screen-join #join-error,
+    #screen-join #join-submit,
+    #screen-join .form-card > .hint-text           { grid-column: 1 / -1; }
+    #screen-join #join-error  { grid-row: 6; }
+    #screen-join #join-submit { grid-row: 7; }
+    #screen-join .form-card > .hint-text { grid-row: 8; }
+
+    /* --- أحجام الأزرار: كلها >= 40px --- */
+    /* 7 قطع بصف واحد بقدر الإمكان: المقاس بيتكيّف مع عرض العمود (بين 32 و40px) */
+    #screen-create .piece-picker, #screen-join .piece-picker { gap: 4px; }
+    #screen-create .piece-option, #screen-join .piece-option {
+        --piece: clamp(32px, calc((var(--form-col) - 30px) / 7), 40px);
+        width: var(--piece); height: var(--piece); font-size: 19px;
+    }
+    #screen-create .count-btn { width: 46px; height: 40px; font-size: 16px; }
+    #screen-create #create-mode-picker { flex-wrap: nowrap; gap: 8px; }
+    #screen-create .mode-btn  { flex: 1 1 0; min-height: 40px; padding: 0.4em 0.3em; font-size: clamp(12px, 1.9vw, 15px); }
+    #screen-create .form-card input[type="text"],
+    #screen-join .form-card input[type="text"] { height: 40px; padding: 0 0.7em; }
+    #screen-join .code-box { width: 44px; height: 44px; font-size: 20px; }
+    #screen-create .form-card > .wood-btn,
+    #screen-join .form-card > .wood-btn { width: 100%; min-height: 42px; font-size: 16px; padding: 0.4em 1em; margin: 2px 0 0; }
+    #screen-create .form-error, #screen-join .form-error { font-size: 12px; min-height: 16px; margin: 2px 0 0; }
+    #screen-create .form-card .hint-text, #screen-join .form-card .hint-text { font-size: 11.5px; margin-top: 4px; }
+}
+
+/* شاشات أفقية قصيرة جدًا (< 340px): نخفي التلميح لتوفير مكان */
+@media (orientation: landscape) and (max-height: 340px) {
+    #screen-create .form-card .hint-text, #screen-join .form-card .hint-text { display: none; }
+}
+
+/* كمبيوتر / تابلت أفقي (ارتفاع 561 - 760px): نفس التخطيط بعمودين لكن بأحجام أريح */
+@media (orientation: landscape) and (min-height: 561px) and (max-height: 760px) {
+    #screen-create .form-card,
+    #screen-join .form-card {
+        --form-w: min(92vw, 780px);
+        --form-col: calc((var(--form-w) - 60px - 20px) / 2);
+        padding: 14px 30px 18px;
+    }
+    #screen-create .form-card > h2, #screen-join .form-card > h2 { font-size: 26px; margin: 4px 0 6px; }
+    .form-card label { font-size: 15px; margin: 10px 0 6px; }
+    #screen-create .piece-option, #screen-join .piece-option {
+        --piece: clamp(36px, calc((var(--form-col) - 30px) / 7), 46px);
+        font-size: 22px;
+    }
+    #screen-create .count-btn { width: 54px; height: 46px; font-size: 18px; }
+    #screen-create .mode-btn  { min-height: 46px; font-size: 16px; }
+    #screen-create .form-card input[type="text"],
+    #screen-join .form-card input[type="text"] { height: 46px; font-size: 17px; }
+    #screen-join .code-box { width: 54px; height: 54px; font-size: 24px; }
+    #screen-create .form-card > .wood-btn,
+    #screen-join .form-card > .wood-btn { min-height: 50px; font-size: 19px; margin-top: 4px; }
+    #screen-create .form-error, #screen-join .form-error { font-size: 14px; min-height: 20px; }
+    #screen-create .form-card .hint-text, #screen-join .form-card .hint-text { font-size: 13px; }
+}
+
+/* لون نص أزرار الاختيار: بدون الاعتماد على لون الزر الافتراضي للمتصفح */
+.count-btn:not(.active), .piece-option { color: var(--ink); }
+
+/* ---------- غرفة الانتظار بالأفقي: عمودين، وزر "بدء اللعبة" يبين بدون تمرير ---------- */
+@media (orientation: landscape) and (max-height: 760px) {
+    #screen-lobby .form-card {
+        width: min(94vw, 720px);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 20px;
+        row-gap: 0;
+        align-content: start;
+        padding: 8px 24px 8px;
+    }
+    #screen-lobby .form-card > h2 { grid-column: 1 / -1; grid-row: 1; margin: 4px 0 2px; font-size: 20px; }
+    #screen-lobby .form-card label { font-size: 13px; margin: 6px 0 4px; }
+
+    /* عمود أول (يمين): كود الغرفة + زر إضافة بوت. عمود ثاني (يسار): اللاعبون */
+    #screen-lobby .form-card > label:nth-of-type(1) { grid-column: 1; grid-row: 2; }
+    #screen-lobby .room-code-display                 { grid-column: 1; grid-row: 3; align-self: start; }
+    #screen-lobby #add-bot-btn                       { grid-column: 1; grid-row: 4; align-self: start; }
+    #screen-lobby .form-card > label:nth-of-type(2) { grid-column: 2; grid-row: 2; }
+    #screen-lobby #lobby-players                     { grid-column: 2; grid-row: 3 / 5; align-self: start; }
+    #screen-lobby #lobby-error,
+    #screen-lobby #start-game-btn,
+    #screen-lobby #lobby-hint,
+    #screen-lobby .link-btn                          { grid-column: 1 / -1; }
+    #screen-lobby #lobby-error      { grid-row: 5; }
+    #screen-lobby #start-game-btn   { grid-row: 6; }
+    #screen-lobby #lobby-hint       { grid-row: 7; }
+    #screen-lobby .link-btn         { grid-row: 8; }
+
+    #screen-lobby .room-code-display span { font-size: 28px; }
+    #screen-lobby .room-code-display .wood-btn.small { font-size: 13px; min-height: 34px; padding: 0.3em 0.9em; margin: 0; }
+    #screen-lobby .lobby-players { gap: 4px; }
+    #screen-lobby .lobby-players .player-item { font-size: 15px; padding: 0.3em 0.7em; }
+    #screen-lobby #add-bot-btn { width: 100%; min-height: 40px; font-size: 15px; margin: 8px 0 0; }
+    #screen-lobby #start-game-btn { width: 100%; min-height: 44px; font-size: 17px; margin: 2px 0 0; }
+    #screen-lobby .form-error { font-size: 12px; min-height: 16px; margin: 2px 0 0; }
+    #screen-lobby .form-card .hint-text { font-size: 12px; margin-top: 4px; text-align: center; }
+    #screen-lobby .form-card .link-btn { font-size: 13px; justify-self: center; padding: 4px 12px; }
+}
+
+@media (orientation: landscape) and (min-height: 561px) and (max-height: 760px) {
+    #screen-lobby .form-card { --lobby-pad: 30px; padding: 14px 30px 18px; }
+    #screen-lobby .form-card > h2 { font-size: 26px; margin: 4px 0 6px; }
+    #screen-lobby .form-card label { font-size: 15px; margin: 10px 0 6px; }
+    #screen-lobby .room-code-display span { font-size: 34px; }
+    #screen-lobby .lobby-players .player-item { font-size: 17px; padding: 0.45em 0.8em; }
+    #screen-lobby #add-bot-btn { min-height: 46px; font-size: 17px; }
+    #screen-lobby #start-game-btn { min-height: 52px; font-size: 19px; }
+    #screen-lobby .form-card .hint-text { font-size: 13px; }
+    #screen-lobby .form-card .link-btn { font-size: 15px; }
+}
+
+/* شاشات أفقية قصيرة: رابط القوانين بغرفة الانتظار بنخفيه (موجود بالصفحة الرئيسية) حتى يبقى كل شي بدون تمرير */
+@media (orientation: landscape) and (max-height: 380px) {
+    #screen-lobby .form-card .link-btn { display: none; }
 }

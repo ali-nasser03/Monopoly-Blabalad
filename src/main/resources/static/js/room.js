@@ -63,6 +63,24 @@ async function apiPost(path, body) {
     return data;
 }
 
+// ---------- زر مشغول: يمنع الضغط المزدوج ويبيّن إنه الطلب شغّال ----------
+// بدونه: ضغطتين سريعتين (أو ضغطة تانية لأن السيرفر بطيء) بتعمل غرفتين.
+const busyButtons = new WeakSet();
+async function runBusy(btn, busyText, action) {
+    if (busyButtons.has(btn)) return;
+    busyButtons.add(btn);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = busyText;
+    try {
+        await action();
+    } finally {
+        busyButtons.delete(btn);
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
 // ---------- اختيار القطعة ----------
 function renderPiecePicker(containerId, defaultPiece) {
     const el = document.getElementById(containerId);
@@ -148,7 +166,8 @@ function readCode() {
 
 // ---------- إنشاء غرفة ----------
 function setupCreateForm() {
-    document.getElementById('create-submit').addEventListener('click', async () => {
+    const submitBtn = document.getElementById('create-submit');
+    submitBtn.addEventListener('click', () => {
         const errorEl = document.getElementById('create-error');
         errorEl.textContent = '';
         const name = document.getElementById('create-name').value.trim();
@@ -163,26 +182,31 @@ function setupCreateForm() {
         // البوتات (= الإجمالي ناقص واحد، وهو إنت).
         const maxPlayers = countValue;
 
-        try {
-            const data = await apiPost('/api/rooms', { name, piece, maxPlayers });
-            enterLobby(data, name, piece);
+        runBusy(submitBtn, 'جاري الإنشاء...', async () => {
+            try {
+                const data = await apiPost('/api/rooms', { name, piece, maxPlayers });
+                enterLobby(data, name, piece);
 
-            if (mode === 'bots') {
-                const botCount = countValue - 1;
-                for (let i = 0; i < botCount; i++) {
-                    const room = await apiPost('/api/rooms/' + currentRoom.code + '/add-bot', { playerId: currentRoom.playerId });
-                    renderLobby(room);
+                if (mode === 'bots') {
+                    const botCount = countValue - 1;
+                    for (let i = 0; i < botCount; i++) {
+                        const room = await apiPost('/api/rooms/' + currentRoom.code + '/add-bot', { playerId: currentRoom.playerId });
+                        renderLobby(room);
+                    }
                 }
+            } catch (e) {
+                // لو الغرفة انعملت وصرنا باللوبي، الخطأ لازم يبين باللوبي مش بشاشة الإنشاء المخفية
+                const inLobby = document.getElementById('screen-lobby').classList.contains('active');
+                (document.getElementById(inLobby ? 'lobby-error' : 'create-error')).textContent = e.message;
             }
-        } catch (e) {
-            errorEl.textContent = e.message;
-        }
+        });
     });
 }
 
 // ---------- دخول غرفة ----------
 function setupJoinForm() {
-    document.getElementById('join-submit').addEventListener('click', async () => {
+    const submitBtn = document.getElementById('join-submit');
+    submitBtn.addEventListener('click', () => {
         const errorEl = document.getElementById('join-error');
         errorEl.textContent = '';
         const name = document.getElementById('join-name').value.trim();
@@ -192,12 +216,14 @@ function setupJoinForm() {
         if (!name) { errorEl.textContent = 'لازم تكتب اسمك'; return; }
         if (code.length !== 4) { errorEl.textContent = 'كود الغرفة أربع أرقام'; return; }
 
-        try {
-            const data = await apiPost('/api/rooms/' + code + '/join', { name, piece });
-            enterLobby(data, name, piece);
-        } catch (e) {
-            errorEl.textContent = e.message;
-        }
+        runBusy(submitBtn, 'جاري الدخول...', async () => {
+            try {
+                const data = await apiPost('/api/rooms/' + code + '/join', { name, piece });
+                enterLobby(data, name, piece);
+            } catch (e) {
+                errorEl.textContent = e.message;
+            }
+        });
     });
 }
 
@@ -267,15 +293,18 @@ function setupLobbyActions() {
         }
     });
 
-    document.getElementById('add-bot-btn').addEventListener('click', async () => {
+    const addBotBtn = document.getElementById('add-bot-btn');
+    addBotBtn.addEventListener('click', () => {
         const errorEl = document.getElementById('lobby-error');
         errorEl.textContent = '';
-        try {
-            const data = await apiPost('/api/rooms/' + currentRoom.code + '/add-bot', { playerId: currentRoom.playerId });
-            renderLobby(data);
-        } catch (e) {
-            errorEl.textContent = e.message;
-        }
+        runBusy(addBotBtn, 'جاري الإضافة...', async () => {
+            try {
+                const data = await apiPost('/api/rooms/' + currentRoom.code + '/add-bot', { playerId: currentRoom.playerId });
+                renderLobby(data);
+            } catch (e) {
+                errorEl.textContent = e.message;
+            }
+        });
     });
 
     document.getElementById('copy-code-btn').addEventListener('click', () => {
