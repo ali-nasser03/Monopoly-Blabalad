@@ -708,30 +708,82 @@ function setupPurchaseActions() {
 }
 
 // ---------- المزاد ----------
+// تتبّع بسيط لحتى نقدر نوميّض "أعلى مزايدة" لما تتغير، ونعرف إذا زاودت أنا
+// بهالمزاد (حتى نقول "زاودوا عليك" لما حدا يتجاوزني).
+let auctionTrackPosition = null;
+let auctionLeaderKey = null;
+let auctionIHaveBid = false;
+
 function renderAuctionModal() {
     const modal = document.getElementById('auction-modal');
     const a = gameState.auction;
     if (!a) {
         modal.classList.add('hidden');
         clearInterval(auctionCountdownInterval);
+        auctionTrackPosition = null;
+        auctionLeaderKey = null;
+        auctionIHaveBid = false;
         return;
     }
     modal.classList.remove('hidden');
+
+    if (auctionTrackPosition !== a.position) {
+        auctionTrackPosition = a.position;
+        auctionLeaderKey = null;
+        auctionIHaveBid = false;
+    }
+
     const sq = squaresByPosition[a.position];
     document.getElementById('auction-title').textContent = 'مزاد: ' + (sq ? sq.name : '');
-    const currentPrice = a.currentBid != null ? a.currentBid : a.openingPrice;
-    document.getElementById('auction-current-price').textContent = 'السعر الحالي: ₪' + currentPrice;
+    document.getElementById('auction-meta').textContent =
+        (sq && sq.price ? 'سعرها الأصلي ₪' + sq.price + ' - ' : '') + 'الافتتاح ₪' + a.openingPrice;
 
-    const nextBid = (a.currentBid != null ? a.currentBid : a.openingPrice) + 10;
-    document.getElementById('auction-next-bid').textContent = nextBid;
-
-    const bidder = a.currentBidderId ? myPlayers.find(p => p.id === a.currentBidderId) : null;
-    document.getElementById('auction-status').textContent = bidder ? ('أعلى مزايدة: ' + bidder.name) : 'ما زاود حدا لسا';
-
+    const hasBid = a.currentBid != null && !!a.currentBidderId;
+    const leader = hasBid ? myPlayers.find(p => p.id === a.currentBidderId) : null;
+    const iAmLeader = hasBid && a.currentBidderId === myPlayerId;
     const isOpener = a.openerPlayerId === myPlayerId;
+    const nextBid = (hasBid ? a.currentBid : a.openingPrice) + 10;
+    if (iAmLeader) auctionIHaveBid = true;
+
+    // صندوق "أعلى مزايدة": الرقم الأكبر بالنافذة هو السعر، مش المؤقت
+    const box = document.getElementById('auction-leader');
+    box.classList.toggle('is-me', iAmLeader);
+    box.classList.toggle('no-bids', !hasBid);
+    document.getElementById('auction-leader-label').textContent = hasBid ? 'أعلى مزايدة' : 'ما زاود حدا لسا';
+    document.getElementById('auction-leader-amount').textContent = '₪' + (hasBid ? a.currentBid : a.openingPrice);
+    document.getElementById('auction-leader-who').textContent = !hasBid
+        ? 'سعر الافتتاح'
+        : (iAmLeader ? '👑 أنت الأعلى' : (PIECE_ICONS[leader ? leader.piece : ''] || '●') + ' ' + (leader ? leader.name : ''));
+
+    // وميض لما تتغير أعلى مزايدة (رد على حدث، مش حركة دائمة)
+    const key = a.position + '|' + a.currentBid + '|' + a.currentBidderId;
+    if (auctionLeaderKey !== null && key !== auctionLeaderKey && hasBid) {
+        box.classList.remove('flash');
+        void box.offsetWidth; // يعيد تشغيل الأنيميشن
+        box.classList.add('flash');
+    }
+    auctionLeaderKey = key;
+
+    // سطر توضيحي واحد حسب وضعي
+    const note = document.getElementById('auction-note');
+    let noteText = '', noteClass = '';
+    if (isOpener) {
+        noteText = 'أنت فاتح المزاد، ما بتقدر تزاود';
+        noteClass = 'info';
+    } else if (!iAmLeader && hasBid && auctionIHaveBid) {
+        noteText = 'زاودوا عليك! بدك ترد؟';
+    } else if (!iAmLeader && myBalance < nextBid) {
+        noteText = 'رصيدك ما بيكفي للمزايدة';
+    }
+    note.textContent = noteText;
+    note.classList.toggle('hidden', !noteText);
+    note.classList.toggle('info', noteClass === 'info');
+
+    // زر المزايدة: مخفي للفاتح، وبيتعطل لما أنا الأعلى
     const bidBtn = document.getElementById('auction-bid-btn');
     bidBtn.style.display = isOpener ? 'none' : '';
-    bidBtn.disabled = myBalance < nextBid;
+    bidBtn.textContent = iAmLeader ? 'أنت الأعلى مزايدة' : 'زايد إلى ₪' + nextBid;
+    bidBtn.disabled = iAmLeader || myBalance < nextBid;
 
     startAuctionCountdown(a.deadlineEpochMs);
 }
@@ -741,7 +793,7 @@ function startAuctionCountdown(deadlineEpochMs) {
     const timerEl = document.getElementById('auction-timer');
     const tick = () => {
         const remaining = Math.max(0, Math.ceil((deadlineEpochMs - Date.now()) / 1000));
-        timerEl.textContent = remaining + 'ث';
+        timerEl.textContent = 'الوقت: ' + remaining + 'ث';
         timerEl.classList.toggle('urgent', remaining <= 3);
         if (remaining <= 0) clearInterval(auctionCountdownInterval);
     };

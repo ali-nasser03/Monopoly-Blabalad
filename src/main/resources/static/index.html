@@ -21,20 +21,19 @@
 
     <!-- 1) شاشة البداية -->
     <section id="screen-landing" class="screen landing-screen active">
-        <div class="parchment-card landing-card">
-            <h1 class="landing-title">مونوبولي بالبلد</h1>
-            <p class="landing-tagline">لعبة مونوبولي بطابع مقدسي - شوارع وأحياء حقيقية من بلدنا</p>
-            <ul class="landing-features">
-                <li>🕌 شوارع وأحياء حقيقية من القدس</li>
-                <li>📱 من المتصفح مباشرة - بدون تحميل</li>
-                <li>🔒 غرف خاصة، بس إنتو وأصحابك</li>
-                <li>🤖 تقدر تلعب لحالك ضد الكمبيوتر</li>
-            </ul>
-            <div class="landing-actions">
-                <button class="wood-btn large" data-goto="screen-join">دخول لعبة</button>
-                <button class="wood-btn large primary" data-goto="screen-create">إنشاء لعبة</button>
+        <div class="gate-card">
+            <div class="gate-brand">
+                <div class="gate-crest" aria-hidden="true"></div>
+                <h1 class="landing-title"><span>مونوبولي</span> <span>بالبلد</span></h1>
+                <p class="landing-tagline">مونوبولي على شوارع وأحياء القدس</p>
             </div>
-            <button class="link-btn" data-open-rules>قوانين اللعبة</button>
+            <div class="gate-actions">
+                <button class="cta cta-primary" data-goto="screen-create" data-preset-mode="friends">إنشاء لعبة</button>
+                <button class="cta cta-secondary" data-goto="screen-create" data-preset-mode="bots">العب ضد الكمبيوتر</button>
+                <button class="cta cta-ghost" data-goto="screen-join">دخول لعبة</button>
+                <p class="landing-note">من المتصفح مباشرة، بدون تحميل</p>
+                <button class="link-btn" data-open-rules>قوانين اللعبة</button>
+            </div>
         </div>
     </section>
 
@@ -366,12 +365,17 @@
 
 <!-- نافذة المزاد -->
 <div id="auction-modal" class="modal-backdrop hidden">
-    <div class="parchment-card property-card">
+    <div class="parchment-card property-card auction-card">
         <h2 id="auction-title"></h2>
-        <p class="card-price" id="auction-current-price"></p>
+        <p class="auction-meta" id="auction-meta"></p>
+        <div class="auction-leader no-bids" id="auction-leader">
+            <span class="auction-leader-label" id="auction-leader-label"></span>
+            <span class="auction-leader-amount" id="auction-leader-amount"></span>
+            <span class="auction-leader-who" id="auction-leader-who"></span>
+        </div>
+        <p class="auction-note hidden" id="auction-note"></p>
         <p class="auction-timer" id="auction-timer"></p>
-        <p class="hint-text" id="auction-status"></p>
-        <button id="auction-bid-btn" class="wood-btn">زايد إلى ₪<span id="auction-next-bid"></span></button>
+        <button id="auction-bid-btn" class="wood-btn auction-bid-btn"></button>
     </div>
 </div>
 

@@ -1122,3 +1122,92 @@ html, body {
 
 /* نص التلميح بالنماذج: كان بلون فاتح على ورق فاتح */
 .form-card .hint-text { color: var(--ink); opacity: 0.72; }
+
+/* =====================================================================
+   نافذة المزاد: "أعلى مزايدة" هي الأوضح (كان المؤقت هو الرقم الأكبر)
+   ===================================================================== */
+.auction-card { text-align: center; }
+.auction-card h2 { margin-bottom: 0.15em; }
+.auction-meta {
+    margin: 0 0 0.5em;
+    font-size: clamp(11px, 1.5vw, 13px);
+    color: var(--ink);
+    opacity: 0.75;
+}
+.auction-leader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05em;
+    margin: 0.2em 0 0.45em;
+    padding: 0.35em 0.6em 0.45em;
+    border: 2px solid var(--gold);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(201,162,39,0.24), rgba(201,162,39,0.08));
+}
+.auction-leader-label {
+    font-size: clamp(12px, 1.7vw, 14px);
+    font-weight: 700;
+    color: var(--maroon-dark);
+}
+.auction-leader-amount {
+    font-family: 'Reem Kufi', sans-serif;
+    font-weight: 700;
+    font-size: clamp(30px, 9.5vh, 52px);
+    line-height: 1.05;
+    color: var(--maroon-dark);
+}
+.auction-leader-who {
+    font-size: clamp(14px, 2vw, 18px);
+    font-weight: 800;
+    color: var(--ink);
+}
+.auction-leader.no-bids {
+    border-style: dashed;
+    background: rgba(255,255,255,0.35);
+}
+.auction-leader.no-bids .auction-leader-amount { color: var(--ink); opacity: 0.6; }
+.auction-leader.is-me {
+    border-color: #2f7d3a;
+    background: linear-gradient(180deg, rgba(47,125,58,0.24), rgba(47,125,58,0.1));
+}
+.auction-leader.is-me .auction-leader-amount,
+.auction-leader.is-me .auction-leader-who,
+.auction-leader.is-me .auction-leader-label { color: #1f5f2a; }
+.auction-leader.flash { animation: bid-flash 0.7s ease-out; }
+@keyframes bid-flash {
+    0%   { transform: scale(1.06); box-shadow: 0 0 0 0 rgba(201,162,39,0.8); }
+    100% { transform: none; box-shadow: 0 0 0 14px rgba(201,162,39,0); }
+}
+.auction-note {
+    margin: 0 0 0.3em;
+    font-size: clamp(12px, 1.7vw, 14px);
+    font-weight: 800;
+    color: #a5231b;
+}
+.auction-note.info { color: var(--ink); opacity: 0.8; font-weight: 700; }
+.auction-note.hidden { display: none; }
+/* المؤقت: شريحة صغيرة بزاوية الكرت (حتى ما ياخد سطر، وما يصير هو الأبرز) */
+.auction-card { max-height: 94dvh; padding-top: 1em; padding-bottom: 1em; }
+.auction-card .auction-timer {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    margin: 0;
+    padding: 0.15em 0.6em;
+    font-size: clamp(11px, 1.5vw, 13px);
+    font-weight: 700;
+    border-radius: 999px;
+    background: rgba(109,31,43,0.12);
+}
+.auction-card .auction-timer.urgent { background: rgba(165,35,27,0.18); }
+.auction-card .auction-bid-btn {
+    width: 100%;
+    margin: 0;
+    font-size: clamp(14px, 2.2vw, 18px);
+    padding: 0.55em 1em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auction-leader.flash { animation: none; }
+}
