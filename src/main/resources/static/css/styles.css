@@ -55,15 +55,11 @@ html, body {
 .rotate-icon { font-size: 3rem; margin-bottom: 0.6em; color: var(--gold); }
 .rotate-overlay p { max-width: 22em; font-size: 1.05rem; }
 
-.app-shell { display: none; }
-
+/* رسالة "دوّر جهازك" بس لما تكون شاشة اللعب (اللوح) ظاهرة والجهاز عمودي.
+   باقي الشاشات بتشتغل عمودي وأفقي. الكلاس board-active بيتحكم فيه room.js (showScreen). */
 @media (orientation: portrait) {
-    .rotate-overlay { display: flex; }
-    .app-shell { display: none !important; }
-}
-@media (orientation: landscape) {
-    .rotate-overlay { display: none; }
-    .app-shell { display: block; }
+    body.board-active .rotate-overlay { display: flex; }
+    body.board-active .app-shell { display: none !important; }
 }
 
 /* ---------- إطار الشاشات: شاشة وحدة ظاهرة بكل لحظة ---------- */
@@ -782,20 +778,7 @@ html, body {
 .rules-content ul { margin: 0; padding-right: 1.2em; }
 .rules-content li { margin-bottom: 0.35em; }
 
-/* ---------- شاشة البداية ---------- */
-.landing-card {
-    text-align: center;
-    width: min(70vw, 380px);
-    max-height: 90dvh;
-    overflow-y: auto;
-}
-.landing-title {
-    font-family: 'Reem Kufi', sans-serif;
-    color: var(--maroon-dark);
-    font-size: clamp(20px, 3.4vw, 32px);
-    margin: 0 0 0.8em;
-}
-.landing-actions { display: flex; flex-direction: column; gap: 0.6em; margin-bottom: 0.8em; }
+/* شاشة البداية: تصميمها بآخر الملف (قسم "بوابة") */
 
 .link-btn {
     background: none;
@@ -957,3 +940,185 @@ html, body {
 .wood-btn.large { font-size: clamp(12px, 1.7vw, 16px); padding: 0.7em 1em; }
 .wood-btn.primary { background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim)); color: var(--ink); }
 .wood-btn.small { font-size: clamp(9px, 1.2vw, 11px); padding: 0.4em 0.7em; margin: 0; }
+/* =====================================================================
+   شاشة البداية: "بوابة" - إطار قوس ذهبي على خلفية باب العامود
+   ===================================================================== */
+
+/* خلفية موحدة لشاشات البداية والإنشاء والدخول وغرفة الانتظار */
+.landing-screen, .form-screen, .lobby-screen {
+    position: relative;
+    overflow: hidden;
+    background: #2a0b12;
+}
+.landing-screen::before, .form-screen::before, .lobby-screen::before {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    background: url('../img/bab-al-amud.jpg') center / cover no-repeat;
+    filter: blur(2px) brightness(0.62) saturate(1.1);
+}
+.landing-screen::after, .form-screen::after, .lobby-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 40%, rgba(42,11,18,0.05), rgba(42,11,18,0.68) 80%),
+        linear-gradient(180deg, rgba(42,11,18,0.28), rgba(42,11,18,0.58));
+}
+.landing-screen > *, .form-screen > *, .lobby-screen > * {
+    position: relative;
+    z-index: 1;
+}
+
+.gate-card {
+    --arch-r: min(44vw, 190px);
+    position: relative;
+    width: min(88vw, 380px);
+    padding: calc(var(--arch-r) * 0.2 + 16px) 1.6em 1.7em;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(62,18,29,0.9), rgba(34,9,16,0.94));
+    border: 2px solid var(--gold);
+    border-radius: var(--arch-r) var(--arch-r) 16px 16px;
+    box-shadow:
+        0 0 0 7px rgba(34,9,16,0.85),
+        0 0 0 8px var(--gold-dim),
+        0 24px 60px rgba(0,0,0,0.65);
+    animation: gate-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* خط ذهبي رفيع داخلي، يتبع شكل القوس */
+.gate-card::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border: 1px solid rgba(201,162,39,0.45);
+    border-radius: calc(var(--arch-r) - 8px) calc(var(--arch-r) - 8px) 9px 9px;
+    pointer-events: none;
+}
+@keyframes gate-rise {
+    from { opacity: 0; transform: translateY(18px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
+}
+
+.gate-crest {
+    width: 60px;
+    height: 38px;
+    margin: 0 auto 10px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cg fill='%23c9a227'%3E%3Ccircle cx='32' cy='2.6' r='2.4'/%3E%3Crect x='31' y='4' width='2' height='6'/%3E%3Cpath d='M14 28 C14 16 22 9 32 9 C42 9 50 16 50 28 Z'/%3E%3Crect x='11' y='28' width='42' height='3' rx='0.6'/%3E%3Crect x='7' y='31' width='50' height='8'/%3E%3C/g%3E%3Cg fill='%233a1019'%3E%3Cpath d='M12 39 V35.6 a2.2 2.2 0 0 1 4.4 0 V39Z'/%3E%3Cpath d='M21 39 V35.6 a2.2 2.2 0 0 1 4.4 0 V39Z'/%3E%3Cpath d='M29.8 39 V35.6 a2.2 2.2 0 0 1 4.4 0 V39Z'/%3E%3Cpath d='M38.6 39 V35.6 a2.2 2.2 0 0 1 4.4 0 V39Z'/%3E%3Cpath d='M47.6 39 V35.6 a2.2 2.2 0 0 1 4.4 0 V39Z'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.landing-title {
+    margin: 0;
+    font-family: 'Reem Kufi', sans-serif;
+    font-weight: 700;
+    font-size: clamp(46px, min(17vw, 11.5vh), 84px);
+    line-height: 1.02;
+    color: var(--gold-bright);
+    text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 0 30px rgba(232,201,77,0.25);
+}
+.landing-title span { display: block; }
+
+.landing-tagline {
+    margin: 0.7em 0 1.5em;
+    font-size: clamp(14px, 4vw, 17px);
+    line-height: 1.5;
+    color: var(--parchment);
+    opacity: 0.92;
+}
+
+.gate-actions { display: flex; flex-direction: column; gap: 10px; }
+
+.cta {
+    font-family: 'Cairo', sans-serif;
+    font-weight: 800;
+    font-size: clamp(16px, 4.4vw, 19px);
+    line-height: 1.2;
+    padding: 0.8em 1em;
+    border: 1px solid var(--gold);
+    border-radius: 14px 14px 6px 6px;
+    cursor: pointer;
+}
+.cta:active { transform: translateY(1px); }
+.cta-primary {
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim));
+    color: var(--ink);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 18px rgba(0,0,0,0.4);
+}
+.cta-secondary {
+    background: linear-gradient(180deg, var(--maroon-bright), var(--maroon-dark) 80%);
+    color: var(--parchment);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 4px 12px rgba(0,0,0,0.4);
+}
+.cta-ghost {
+    background: transparent;
+    color: var(--parchment);
+    border-color: rgba(201,162,39,0.6);
+}
+.cta:focus-visible,
+.landing-screen .link-btn:focus-visible {
+    outline: 3px solid var(--gold-bright);
+    outline-offset: 3px;
+}
+
+.landing-note {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--parchment-dark);
+    opacity: 0.85;
+}
+.landing-screen .link-btn {
+    color: var(--gold-bright);
+    font-size: 14px;
+}
+
+/* موبايل أفقي أو أي شاشة قصيرة: عمودين (الاسم يمين، الأزرار يسار) */
+@media (orientation: landscape) and (max-height: 560px) {
+    .gate-card {
+        --arch-r: 96px;
+        width: min(92vw, 780px);
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        align-items: center;
+        column-gap: 28px;
+        padding: 30px 50px 28px;
+    }
+    .gate-crest { width: 48px; height: 30px; margin-bottom: 6px; }
+    .landing-title { font-size: clamp(34px, 12.5vh, 60px); }
+    .landing-tagline { margin: 0.5em 0 0; font-size: 15px; }
+    .gate-actions { gap: 8px; }
+    .cta { font-size: 16px; padding: 0.65em 1em; }
+    .landing-note { margin: 2px 0 0; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gate-card { animation: none; }
+}
+
+/* =====================================================================
+   الوضع العمودي: النماذج وغرفة الانتظار والقوانين بأحجام مريحة للموبايل
+   (القيم الأصلية مضبوطة للوضع الأفقي، وبتطلع صغيرة جدًا عمودي)
+   ===================================================================== */
+@media (orientation: portrait) {
+    .form-card { width: min(92vw, 420px); padding: 1.4em 1.2em 1.2em; }
+    .form-card h2 { font-size: 26px; }
+    .form-card label { font-size: 15px; margin: 0.9em 0 0.35em; }
+    .form-card input[type="text"] { font-size: 17px; padding: 0.6em 0.8em; }
+    .form-card .back-btn { font-size: 1.6rem; top: 8px; right: 12px; }
+    .form-error { font-size: 14px; }
+    .piece-option { width: 48px; height: 48px; font-size: 24px; }
+    .count-btn { width: 46px; height: 46px; font-size: 17px; }
+    .mode-btn { font-size: 16px; }
+    .code-box { width: 48px; height: 58px; font-size: 24px; }
+    .room-code-display span { font-size: 36px; }
+    .lobby-players .player-item { font-size: 16px; }
+    .host-badge, .disconnected-badge { font-size: 12px; }
+    .form-card .wood-btn { font-size: 18px; padding: 0.7em 1em; width: 100%; }
+    .form-card .wood-btn.small { width: auto; font-size: 14px; padding: 0.45em 0.9em; }
+    .form-card .hint-text { font-size: 13px; }
+    .form-card .link-btn { font-size: 15px; }
+    .rules-content { width: min(92vw, 460px); }
+    .rules-content h3 { font-size: 17px; }
+    .rules-content p, .rules-content li { font-size: 14.5px; }
+}
+
+/* نص التلميح بالنماذج: كان بلون فاتح على ورق فاتح */
+.form-card .hint-text { color: var(--ink); opacity: 0.72; }

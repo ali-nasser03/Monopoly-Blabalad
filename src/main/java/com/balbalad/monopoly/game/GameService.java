@@ -1341,6 +1341,16 @@ public class GameService {
         if (state.getNegotiation() != null && isBot(room, state.getNegotiation().getCounterpartId())) {
             return state.getNegotiation().getCounterpartId();
         }
+        // مزاد شغال: أي بوت مؤهل (مش فاتح المزاد، مش صاحب أعلى مزايدة، وسقفه أعلى من
+        // المزايدة الجاية) بيشارك. لو ما في ولا واحد، بنكمل للأسفل وبنرجع null -
+        // شرط الدور العادي تحت بيمنع البوت يرمي النرد وقت المزاد.
+        if (state.getAuction() != null) {
+            List<String> eligible = new ArrayList<>();
+            for (Player p : room.getPlayers()) {
+                if (p.isBot() && botNextBidAmount(state, p.getId()) > 0) eligible.add(p.getId());
+            }
+            if (!eligible.isEmpty()) return eligible.get(random.nextInt(eligible.size()));
+        }
         // دور عادي (رمي أو قرار مسكوبية) - بس لو ما في أي قرار تاني معلق يوقف الدور.
         // ملاحظة: ما منتحقق من hasRolledThisTurn هون قصدًا - لو البوت رمى دبل
         // وصار إله رمية إضافية بنفس دوره، هاد العلم بيضل true وبيمنعه يرمي
@@ -1378,6 +1388,8 @@ public class GameService {
             botDecidePurchase(code, botId, state);
         } else if (state.getNegotiation() != null && botId.equals(state.getNegotiation().getCounterpartId())) {
             botRespondNegotiation(code, botId, state);
+        } else if (state.getAuction() != null) {
+            botBid(code, botId, state);
         } else if (Boolean.TRUE.equals(state.getInJail().get(botId))) {
             botJailDecision(code, botId, state);
         } else {
@@ -1402,6 +1414,93 @@ public class GameService {
                 openAuction(code, botId);
             }
         } catch (RuntimeException ignored) {}
+    }
+
+    /** احتياطي بيضل مع البوت بعد المزايدة (أقل لو الأرض بتكمّل له مجموعة كاملة). */
+    private static final int BOT_AUCTION_RESERVE = 100;
+    private static final int BOT_AUCTION_RESERVE_COMPLETING = 50;
+
+    /** يزاود بالمبلغ يلي حدده botNextBidAmount، عبر نفس دالة bid() يلي بيستعملها أي لاعب. */
+    private void botBid(String code, String botId, GameState state) {
+        synchronized (state) {
+            int amount = botNextBidAmount(state, botId);
+            if (amount <= 0) return;
+            try {
+                bid(code, botId, amount);
+            } catch (RuntimeException ignored) {
+                // تغيرت الحالة بنفس اللحظة (لاعب زاود أو انتهى المزاد) - نحاول بالدورة الجاية
+            }
+        }
+    }
+
+    /**
+     * المبلغ يلي البوت رح يزاود فيه هلق، أو -1 لو ما بيقدر/ما بدو يزاود:
+     * فاتح المزاد وصاحب أعلى مزايدة ما بيزاودوا، والبوت المفلس طالع من الدور،
+     * وإذا المزايدة الجاية فوق سقفه بيوقف. الزيادة بتكبر شوي مع سعر الأرض
+     * (حتى ما يطول المزاد) وبتتغير عشوائيًا بين خطوة وخطوتين.
+     */
+    private int botNextBidAmount(GameState state, String botId) {
+        AuctionState auction = state.getAuction();
+        if (auction == null || Instant.now().isAfter(auction.getDeadline())) return -1;
+        if (botId.equals(auction.getOpenerPlayerId()) || botId.equals(auction.getCurrentBidderId())) return -1;
+        if (!state.getTurnOrder().contains(botId)) return -1;
+
+        int base = auction.getCurrentBidderId() == null ? auction.getOpeningPrice() : auction.getCurrentBid();
+        int minBid = base + MIN_BID_INCREMENT;
+        int ceiling = botAuctionCeiling(state, botId, auction.getPosition());
+        if (ceiling < minBid) return -1;
+
+        BoardSquare sq = BoardData.SQUARES.get(auction.getPosition());
+        int step = Math.max(MIN_BID_INCREMENT, (int) Math.round(sq.price() * 0.05 / 10.0) * 10);
+        int amount = base + step * (1 + random.nextInt(2));
+        return Math.max(minBid, Math.min(amount, ceiling));
+    }
+
+    /**
+     * أعلى سعر البوت مستعد يوصله بمزاد هاي الأرض. بيبدأ من سعرها الأصلي وبيتعدل:
+     * أكتر لو بتكمّل له مجموعة كاملة، أو بتمنع لاعب تاني من إكمالها، أو عنده
+     * أرض من نفس المجموعة؛ وأقل شوي للمرافق. بتتغير ±10% من بوت لبوت (ثابتة
+     * لنفس الأرض) عشان ما يتعادلوا دايمًا. وما بيتجاوز رصيده ناقص احتياطي.
+     */
+    private int botAuctionCeiling(GameState state, String botId, int position) {
+        BoardSquare sq = BoardData.SQUARES.get(position);
+        if (sq.price() == null) return 0;
+
+        double factor = 1.0;
+        boolean completesGroup = false;
+
+        if (sq.type() == SquareType.UTILITY) {
+            boolean ownsOtherUtility = BoardData.SQUARES.stream()
+                    .anyMatch(s -> s.type() == SquareType.UTILITY && s.position() != position
+                            && botId.equals(state.getOwnership().get(s.position())));
+            factor = ownsOtherUtility ? 1.1 : 0.9;
+        } else if (sq.colorGroup() != ColorGroup.NONE) {
+            List<BoardSquare> others = BoardData.SQUARES.stream()
+                    .filter(s -> s.colorGroup() == sq.colorGroup() && s.position() != position)
+                    .collect(Collectors.toList());
+            if (!others.isEmpty()) {
+                long mine = others.stream().filter(s -> botId.equals(state.getOwnership().get(s.position()))).count();
+                String firstOwner = state.getOwnership().get(others.get(0).position());
+                boolean opponentHoldsRest = firstOwner != null && !firstOwner.equals(botId)
+                        && others.stream().allMatch(s -> firstOwner.equals(state.getOwnership().get(s.position())));
+                if (mine == others.size()) {
+                    factor = 1.5;
+                    completesGroup = true;
+                } else if (opponentHoldsRest) {
+                    factor = 1.3;
+                } else if (mine >= 1) {
+                    factor = 1.2;
+                }
+            }
+        }
+
+        int jitterPercent = Math.floorMod(botId.hashCode() * 31 + position, 21) - 10;
+        int ceiling = (int) Math.floor(sq.price() * factor * (1 + jitterPercent / 100.0));
+
+        Integer balance = state.getBalances().get(botId);
+        if (balance == null) return 0;
+        int reserve = completesGroup ? BOT_AUCTION_RESERVE_COMPLETING : BOT_AUCTION_RESERVE;
+        return Math.max(0, Math.min(ceiling, balance - reserve));
     }
 
     /** يهدم ويرهن قد ما يلزم (نفس منطق الحل التلقائي)، وبعدين يسدد أو يعلن إفلاسه. */
