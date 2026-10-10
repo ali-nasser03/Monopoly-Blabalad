@@ -119,6 +119,61 @@ async function runBusy(btn, busyText, action) {
     }
 }
 
+function clearProblem() {
+    const bar = document.getElementById('problem-bar');
+    if (bar) bar.remove();
+}
+
+// تشخيص + إصلاح ذاتي لـ board.js. بيجيب الملف من السيرفر بدون كاش:
+//   - مش موجود (404)  -> بيقول هيك
+//   - تالف/ناقص       -> بيقول رسالة الخطأ وحجم الملف
+//   - سليم            -> بيشغّله (داخل دالة، بدون تعارض أسماء) وبتكمل اللعبة عادي
+let boardRecovery = null;
+function recoverBoardJs() {
+    if (window.startBoardGame) return Promise.resolve(true);
+    if (boardRecovery) return boardRecovery;
+    boardRecovery = (async () => {
+        let reason = null;
+        try {
+            const res = await fetch('/js/board.js?r=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) {
+                reason = 'ملف board.js مش موجود على السيرفر (HTTP ' + res.status + '). تأكد إنه موجود بـ static/js/board.js وإنه انرفع مع آخر commit وخلص الـ deploy.';
+            } else {
+                const text = await res.text();
+                let run = null;
+                try {
+                    run = new Function(text);
+                } catch (e) {
+                    reason = (e instanceof EvalError)
+                        ? 'المتصفح منع تشغيل الكود (EvalError): ' + e.message
+                        : 'ملف board.js على السيرفر تالف أو ناقص (' + e.message + ')، حجمه ' + text.length + ' حرف. انسخ الملف كامل من جديد وارفعه.';
+                }
+                if (run) {
+                    try {
+                        run();
+                    } catch (e) {
+                        reason = 'board.js وقف أثناء التشغيل: ' + e.message;
+                    }
+                    if (!reason && !window.startBoardGame) {
+                        reason = 'board.js اشتغل بس ما عرّف startBoardGame، يعني نسخة غير صحيحة من الملف.';
+                    }
+                }
+            }
+        } catch (e) {
+            reason = 'ما قدرت أحمّل board.js: ' + e.message;
+        }
+        if (window.startBoardGame) {
+            clearProblem();
+            return true;
+        }
+        console.error('[init] ' + reason);
+        reportProblem(reason);
+        boardRecovery = null; // يسمح بمحاولة تانية لما المستخدم يعيد المحاولة
+        return false;
+    })();
+    return boardRecovery;
+}
+
 // ---------- اختيار القطعة ----------
 function renderPiecePicker(containerId, defaultPiece) {
     const el = document.getElementById(containerId);
@@ -401,9 +456,9 @@ function connectWebSocket(code) {
 // ---------- الانتقال لشاشة اللعب ----------
 function enterGame(room) {
     if (!window.startBoardGame) {
-        // board.js ما انحمّل: بدل لوح فاضي، منظهر السبب وبنضل باللوبي
+        // board.js ما اشتغل: منشخّص السبب (وبنحاول نحمّله من جديد)، وبنضل باللوبي لحد ما يتصلح
         showScreen('screen-lobby');
-        reportProblem('ملف اللوح (board.js) ما انحمّل عندك، فما بنقدر نفتح اللعبة. اعمل تحديث قوي Ctrl+F5 (أو امسح الكاش) وجرب مرة ثانية.');
+        recoverBoardJs().then(ok => { if (ok) enterGame(room); });
         return;
     }
     showScreen('screen-game');
@@ -468,10 +523,11 @@ safeInit('نموذج الإنشاء', setupCreateForm);
 safeInit('نموذج الدخول', setupJoinForm);
 safeInit('غرفة الانتظار', setupLobbyActions);
 
-// board.js لازم يكون عرّف startBoardGame قبل هون؛ لو لا، في خطأ بتحميله
+// board.js لازم يكون عرّف startBoardGame قبل هون؛ لو لا، منشخّص السبب بالشريط الأحمر
+// ومنحاول نحمّله من جديد بدون كاش (بيصلّح حالة نسخة قديمة/تالفة بكاش المتصفح).
 if (!window.startBoardGame) {
     console.error('[init] board.js ما انحمّل أو وقف بنص الطريق (window.startBoardGame مش معرّفة)');
-    reportProblem('ملف اللعبة (board.js) ما انحمّل صح. اعمل Ctrl+F5؛ وإذا ضلت المشكلة افتح F12 ← Console وصوّر الخطأ الأحمر.');
+    recoverBoardJs();
 }
 
 tryAutoReconnect().catch(e => console.error('[init] رجوع تلقائي فشل:', e));

@@ -1501,25 +1501,30 @@ function finishRating() {
     if (window.returnToLandingAfterGame) window.returnToLandingAfterGame();
 }
 
-setupModalClose();
-setupDiceRoll();
-setupPurchaseActions();
-setupAuctionActions();
-setupJailActions();
-setupDebtActions();
-setupNegotiationActions();
-setupEndVote();
-setupExtendVoteActions();
-setupRulesButton();
-setupGameOverButton();
-setupRatingModal();
-
-document.getElementById('card-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'card-modal') {
-        e.currentTarget.classList.add('hidden');
-        clearTimeout(cardHideTimeout);
+// كل خطوة تهيئة بتتنفذ لحالها: لو عنصر ناقص من index.html (مثلًا نسخة قديمة)
+// ما بتوقف باقي التهيئة، وما بيضيع تعريف window.startBoardGame اللي تحت.
+[
+    setupModalClose, setupDiceRoll, setupPurchaseActions, setupAuctionActions,
+    setupJailActions, setupDebtActions, setupNegotiationActions, setupEndVote,
+    setupExtendVoteActions, setupRulesButton, setupGameOverButton, setupRatingModal
+].forEach(step => {
+    try {
+        step();
+    } catch (e) {
+        console.error('[board] فشلت خطوة التهيئة ' + step.name + ':', e);
     }
 });
+
+try {
+    document.getElementById('card-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'card-modal') {
+            e.currentTarget.classList.add('hidden');
+            clearTimeout(cardHideTimeout);
+        }
+    });
+} catch (e) {
+    console.error('[board] فشل ربط card-modal:', e);
+}
 
 // ---------- كشف حركة اللاعبين (لتحريك القطع بالأنيميشن) ----------
 const POST_ARRIVAL_BUFFER_MS = 500; // نص ثانية إضافية بعد ما توصل القطعة، قبل ما نظهر نتيجة الوقوف
